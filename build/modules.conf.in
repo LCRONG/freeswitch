@@ -172,3 +172,6 @@ xml_int/mod_xml_scgi
 
 ## Experimental Modules (don't cry if they're broken)
 #../../contrib/mod/xml_int/mod_xml_odbc
+
+lcr/mod_lcr_asr
+lcr/mod_lcr_test

@@ -159,3 +159,6 @@ xml_int/mod_xml_ldap
 #xml_int/mod_xml_radius
 xml_int/mod_xml_rpc
 xml_int/mod_xml_scgi
+
+lcr/mod_lcr_asr
+lcr/mod_lcr_test

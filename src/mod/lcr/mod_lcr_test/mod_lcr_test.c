@@ -1,14 +1,9 @@
 #include <switch.h>
 
-/*
-SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_example_shutdown);
-SWITCH_MODULE_RUNTIME_FUNCTION(mod_example_runtime);
-*/
-
-
 SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_test_load);
 SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_lcr_test_shutdown);
-SWITCH_MODULE_DEFINITION(mod_lcr_test, mod_lcr_test_load, mod_lcr_test_shutdown, NULL);
+SWITCH_MODULE_RUNTIME_FUNCTION(mod_lcr_test_runtime);
+SWITCH_MODULE_DEFINITION(mod_lcr_test, mod_lcr_test_load, mod_lcr_test_shutdown, mod_lcr_test_runtime);
 
 SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_test_load)
 {
@@ -34,15 +29,17 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_lcr_test_shutdown)
 /*
   If it exists, this is called in it's own thread when the module-load completes
   If it returns anything but SWITCH_STATUS_TERM it will be called again automaticly
-SWITCH_MODULE_RUNTIME_FUNCTION(mod_example_runtime);
+  */
+SWITCH_MODULE_RUNTIME_FUNCTION(mod_lcr_test_runtime)
 {
-	while(looping)
+	while(1)
 	{
 		switch_yield(1000);
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "mod_lcr_test_runtime Hello World!\n");
 	}
 	return SWITCH_STATUS_TERM;
 }
-*/
+
 
 /* For Emacs:
  * Local Variables:

@@ -1,5 +1,6 @@
 #include <switch.h>
 #include <switch_buffer.h>
+#include <libwebsockets.h>
 
 SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_test_load);
 SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_lcr_test_shutdown);
@@ -10,9 +11,12 @@ void test_switch_buffer()
 {
 	switch_buffer_t *audio_buffer;
 	char a[10] = {'1','2','3','4','5'};
-	switch_buffer_create_dynamic(&audio_buffer, 2, 6, 12);
-	switch_buffer_write(audio_buffer, a, strlen(a));
+	char pre[LWS_PRE] ={0};
+	memset(pre, 1, sizeof(pre));
+	switch_buffer_create_dynamic(&audio_buffer, 2, 50, 100);
+	switch_buffer_write(audio_buffer, pre, sizeof(pre));
 	switch_buffer_read(audio_buffer,&a[5],1);
+	//截断数据
 	switch_buffer_toss(audio_buffer,2);
 	switch_buffer_write(audio_buffer, a, strlen(a));
 }

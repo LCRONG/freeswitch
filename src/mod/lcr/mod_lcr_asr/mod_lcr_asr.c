@@ -138,6 +138,7 @@ SWITCH_DECLARE(switch_status_t) get_ws_rx_text(switch_buffer_t *buffer ,char *in
 
 void lws_create_ctx()
 {
+	memset(lws_pre_arr, 1, sizeof(lws_pre_arr));
     ctx_info.port = CONTEXT_PORT_NO_LISTEN;
     ctx_info.iface = NULL;
     ctx_info.protocols = protocols;
@@ -261,7 +262,8 @@ static switch_status_t asr_feed(switch_asr_handle_t *ah, void *data, unsigned in
     lws_write_res = switch_buffer_write(asr_obj->pr_obj.audio_buffer, data, len);
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "asr_feed lws_write_res: %d audio_buffer_len:%d\n",  lws_write_res,len);
 
-    lws_write_res = lws_write(asr_obj->lws_obj.g_wsi, ((unsigned char *)get_switch_buffer_ptr(asr_obj->pr_obj.audio_buffer))+LWS_PRE,len, LWS_WRITE_BINARY);
+	switch_buffer_toss(asr_obj->pr_obj.audio_buffer,sizeof(lws_pre_arr));
+    lws_write_res = lws_write(asr_obj->lws_obj.g_wsi, (unsigned char *)get_switch_buffer_ptr(asr_obj->pr_obj.audio_buffer),len, LWS_WRITE_BINARY);
 
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "asr_feed lws_write_res: %d audio_buffer_len:%d\n",  lws_write_res,len);
     if (lws_write_res < (int)len) {
@@ -332,60 +334,60 @@ static void asr_float_param(switch_asr_handle_t *ah, char *param, double val)
 }
 
 SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_asr_load)
-        {
-                switch_asr_interface_t *asr_interface;
+{
+	switch_asr_interface_t *asr_interface;
 
-        /* connect my internal structure to the blank pointer passed to me */
-        *module_interface = switch_loadable_module_create_module_interface(pool, modname);
-        // 打印版本信息
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "libwebsockets version: %s\n", lws_get_library_version());
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "mod_lcr_asr_load \n");
+	/* connect my internal structure to the blank pointer passed to me */
+	*module_interface = switch_loadable_module_create_module_interface(pool, modname);
+	// 打印版本信息
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "libwebsockets version: %s\n", lws_get_library_version());
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "mod_lcr_asr_load \n");
 
-        lws_create_ctx();
+	lws_create_ctx();
 
-        asr_interface = switch_loadable_module_create_interface(*module_interface, SWITCH_ASR_INTERFACE);
-        asr_interface->interface_name = "lcr_asr";
-        asr_interface->asr_open = asr_open;
-        asr_interface->asr_load_grammar = asr_load_grammar;
-        asr_interface->asr_unload_grammar = asr_unload_grammar;
-        asr_interface->asr_close = asr_close;
-        asr_interface->asr_feed = asr_feed;
-        asr_interface->asr_resume = asr_resume;
-        asr_interface->asr_pause = asr_pause;
-        asr_interface->asr_check_results = asr_check_results;
-        asr_interface->asr_get_results = asr_get_results;
-        asr_interface->asr_start_input_timers = asr_start_input_timers;
-        asr_interface->asr_text_param = asr_text_param;
-        asr_interface->asr_numeric_param = asr_numeric_param;
-        asr_interface->asr_float_param = asr_float_param;
+	asr_interface = switch_loadable_module_create_interface(*module_interface, SWITCH_ASR_INTERFACE);
+	asr_interface->interface_name = "lcr_asr";
+	asr_interface->asr_open = asr_open;
+	asr_interface->asr_load_grammar = asr_load_grammar;
+	asr_interface->asr_unload_grammar = asr_unload_grammar;
+	asr_interface->asr_close = asr_close;
+	asr_interface->asr_feed = asr_feed;
+	asr_interface->asr_resume = asr_resume;
+	asr_interface->asr_pause = asr_pause;
+	asr_interface->asr_check_results = asr_check_results;
+	asr_interface->asr_get_results = asr_get_results;
+	asr_interface->asr_start_input_timers = asr_start_input_timers;
+	asr_interface->asr_text_param = asr_text_param;
+	asr_interface->asr_numeric_param = asr_numeric_param;
+	asr_interface->asr_float_param = asr_float_param;
 
-        /* indicate that the module should continue to be loaded */
-        return SWITCH_STATUS_SUCCESS;
-        }
+	/* indicate that the module should continue to be loaded */
+	return SWITCH_STATUS_SUCCESS;
+}
 
 // Called when the system shuts down
 SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_lcr_asr_shutdown)
-        {
-                lws_context_destroy(lws_context_obj);
-        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "mod_lcr_asr_shutdown \n");
-        return SWITCH_STATUS_UNLOAD;
-        }
+{
+	lws_context_destroy(lws_context_obj);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "mod_lcr_asr_shutdown \n");
+	return SWITCH_STATUS_UNLOAD;
+}
 
 /**
 * If it exists, this is called in it's own thread when the module-load completes
 * If it returns anything but SWITCH_STATUS_TERM it will be called again automaticly
  */
 SWITCH_MODULE_RUNTIME_FUNCTION(mod_lcr_asr_runtime)
-        {
+{
 
-                while(1)
-                {
-                    switch_yield(1000);
-                    lws_service( lws_context_obj, 0 );
-                    return SWITCH_STATUS_CONTINUE;
-                }
-                return SWITCH_STATUS_TERM;
-        }
+	while(1)
+	{
+	    switch_yield(1000);
+	    lws_service( lws_context_obj, 0 );
+	    return SWITCH_STATUS_CONTINUE;
+	}
+	return SWITCH_STATUS_TERM;
+}
 
 
 

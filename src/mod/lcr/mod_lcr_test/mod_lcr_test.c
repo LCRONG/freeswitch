@@ -1,4 +1,5 @@
 #include <switch.h>
+#include <switch_buffer.h>
 
 SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_test_load);
 SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_lcr_test_shutdown);
@@ -34,8 +35,15 @@ SWITCH_MODULE_RUNTIME_FUNCTION(mod_lcr_test_runtime)
 {
 	while(1)
 	{
+		switch_buffer_t *audio_buffer;
+		char a[10] = {'1','2','3','4','5'};
+		switch_buffer_create_dynamic(&audio_buffer, 2, 6, 10);
+		switch_buffer_write(audio_buffer, a, strlen(a));
+		switch_buffer_toss(audio_buffer,2);
+		switch_buffer_write(audio_buffer, a, strlen(a));
 		switch_yield(1000);
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "mod_lcr_test_runtime Hello World!\n");
+		break;
 	}
 	return SWITCH_STATUS_TERM;
 }

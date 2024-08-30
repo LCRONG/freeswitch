@@ -6,6 +6,17 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_lcr_test_shutdown);
 SWITCH_MODULE_RUNTIME_FUNCTION(mod_lcr_test_runtime);
 SWITCH_MODULE_DEFINITION(mod_lcr_test, mod_lcr_test_load, mod_lcr_test_shutdown, mod_lcr_test_runtime);
 
+void test_switch_buffer()
+{
+	switch_buffer_t *audio_buffer;
+	char a[10] = {'1','2','3','4','5'};
+	switch_buffer_create_dynamic(&audio_buffer, 2, 6, 12);
+	switch_buffer_write(audio_buffer, a, strlen(a));
+	switch_buffer_read(audio_buffer,&a[5],1);
+	switch_buffer_toss(audio_buffer,2);
+	switch_buffer_write(audio_buffer, a, strlen(a));
+}
+
 SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_test_load)
 {
 	/* connect my internal structure to the blank pointer passed to me */
@@ -35,12 +46,7 @@ SWITCH_MODULE_RUNTIME_FUNCTION(mod_lcr_test_runtime)
 {
 	while(1)
 	{
-		switch_buffer_t *audio_buffer;
-		char a[10] = {'1','2','3','4','5'};
-		switch_buffer_create_dynamic(&audio_buffer, 2, 6, 10);
-		switch_buffer_write(audio_buffer, a, strlen(a));
-		switch_buffer_toss(audio_buffer,2);
-		switch_buffer_write(audio_buffer, a, strlen(a));
+		test_switch_buffer();
 		switch_yield(1000);
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "mod_lcr_test_runtime Hello World!\n");
 		break;

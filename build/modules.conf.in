@@ -175,3 +175,4 @@ xml_int/mod_xml_scgi
 
 lcr/mod_lcr_asr
 lcr/mod_lcr_test
+lcr/mod_lcr_app

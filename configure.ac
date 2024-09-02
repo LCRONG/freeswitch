@@ -2218,6 +2218,7 @@ AC_CONFIG_FILES([Makefile
 		src/mod/languages/mod_basic/Makefile
 		src/mod/lcr/mod_lcr_asr/Makefile
 		src/mod/lcr/mod_lcr_test/Makefile
+        src/mod/lcr/mod_lcr_app/Makefile
 		src/mod/loggers/mod_console/Makefile
 		src/mod/loggers/mod_graylog2/Makefile
 		src/mod/loggers/mod_logfile/Makefile

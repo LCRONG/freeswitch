@@ -136,7 +136,7 @@ SWITCH_DECLARE(switch_status_t) get_ws_rx_text(switch_buffer_t *buffer ,char *in
     return SWITCH_STATUS_SUCCESS;
 }
 
-void lws_create_ctx()
+void lws_create_ctx( void )
 {
 	memset(lws_pre_arr, 1, sizeof(lws_pre_arr));
     ctx_info.port = CONTEXT_PORT_NO_LISTEN;
@@ -245,6 +245,10 @@ static switch_status_t asr_feed(switch_asr_handle_t *ah, void *data, unsigned in
 {
     lcr_asr_t *asr_obj = (lcr_asr_t *)ah->private_info;
     int lws_write_res = 0;
+    int samples_index;
+    int16_t * resamples = data;
+    int16_t one_sample;
+//    FILE *stream = fopen("/usr/local/freeswitch/conf/lcr.pcm", "ab");
 
     // check the asr close flag
     if ( switch_test_flag(ah, SWITCH_ASR_FLAG_CLOSED) ) {
@@ -258,15 +262,29 @@ static switch_status_t asr_feed(switch_asr_handle_t *ah, void *data, unsigned in
     switch_buffer_zero(asr_obj->pr_obj.audio_buffer);
 
     lws_write_res = switch_buffer_write(asr_obj->pr_obj.audio_buffer, lws_pre_arr, sizeof(lws_pre_arr));
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "asr_feed lws_write_res: %d audio_buffer_len:%lu\n",  lws_write_res,sizeof(lws_pre_arr));
-    lws_write_res = switch_buffer_write(asr_obj->pr_obj.audio_buffer, data, len);
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "asr_feed lws_write_res: %d audio_buffer_len:%d\n",  lws_write_res,len);
+//    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "asr_feed lws_write_res: %d audio_buffer_len:%lu\n",  lws_write_res,sizeof(lws_pre_arr));
+
+    /**
+     * 码率由48000转为16000
+     * 对于48000采样率的单声道音频，每个样本需要2个字节来存储。
+     * len/2就是计算采样点,每三个采样点合并成一个
+     */
+    for(samples_index= 0 ;samples_index < (len/2) ; samples_index += 3){
+        one_sample =(resamples[samples_index] + resamples[samples_index+1] + resamples[samples_index+2]) / 3;
+        switch_buffer_write(asr_obj->pr_obj.audio_buffer,  &one_sample, sizeof(int16_t));
+    }
+//    lws_write_res = switch_buffer_write(asr_obj->pr_obj.audio_buffer, data, len);
+//    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "asr_feed lws_write_res: %d audio_buffer_len:%d\n",  lws_write_res,len);
 
 	switch_buffer_toss(asr_obj->pr_obj.audio_buffer,sizeof(lws_pre_arr));
-    lws_write_res = lws_write(asr_obj->lws_obj.g_wsi, (unsigned char *)get_switch_buffer_ptr(asr_obj->pr_obj.audio_buffer),len, LWS_WRITE_BINARY);
+//    fwrite( get_switch_buffer_ptr(asr_obj->pr_obj.audio_buffer),
+//            switch_buffer_inuse(asr_obj->pr_obj.audio_buffer),1, stream);
+    lws_write_res = lws_write(asr_obj->lws_obj.g_wsi, (unsigned char *)switch_buffer_get_head_pointer(asr_obj->pr_obj.audio_buffer),
+                              switch_buffer_inuse(asr_obj->pr_obj.audio_buffer), LWS_WRITE_BINARY);
 
-    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "asr_feed lws_write_res: %d audio_buffer_len:%d\n",  lws_write_res,len);
-    if (lws_write_res < (int)len) {
+//    fclose(stream);
+//    switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "asr_feed lws_write_res: %d audio_buffer_len:%d\n",  lws_write_res,len);
+    if (lws_write_res < 0) {
         return SWITCH_STATUS_FALSE;
     }
     return SWITCH_STATUS_SUCCESS;

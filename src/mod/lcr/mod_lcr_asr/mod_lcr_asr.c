@@ -317,6 +317,7 @@ static switch_status_t asr_get_results(switch_asr_handle_t *ah, char **xmlstr, s
     if (switch_test_flag(&asr_obj->pr_obj, YY_FLAG_HAS_TEXT)) {
         *xmlstr = switch_mprintf("%s", get_switch_buffer_ptr(asr_obj->pr_obj.text_buffer));
         switch_clear_flag_locked(&asr_obj->pr_obj, YY_FLAG_HAS_TEXT);
+        switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "asr_get_results xmlstr: %s\n",*xmlstr);
         return SWITCH_STATUS_SUCCESS;
     }
     return SWITCH_STATUS_FALSE;
@@ -400,7 +401,7 @@ SWITCH_MODULE_RUNTIME_FUNCTION(mod_lcr_asr_runtime)
 
 	while(1)
 	{
-	    switch_yield(1000);
+	    switch_yield(100);
 	    lws_service( lws_context_obj, 0 );
 	    return SWITCH_STATUS_CONTINUE;
 	}

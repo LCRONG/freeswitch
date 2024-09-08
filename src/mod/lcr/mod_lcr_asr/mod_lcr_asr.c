@@ -3,14 +3,9 @@
 
 #define MAX_PAYLOAD_SIZE 10 * 1024
 typedef enum {
-    YY_FLAG_READY = (1 << 0),
-    YY_FLAG_INPUT_TIMERS = (1 << 1),
-    YY_FLAG_NOINPUT_TIMEOUT = (1 << 2),
-    YY_FLAG_SPEECH_TIMEOUT = (1 << 3),
-    YY_FLAG_RECOGNITION = (1 << 4),
-    YY_FLAG_HAS_TEXT = (1 << 5),
-    YY_FLAG_WS_READY = (1 << 6),
-    YY_FLAG_WS_CLOSE = (1 << 7),
+    YY_FLAG_HAS_TEXT = (1 << 0),
+    YY_FLAG_WS_READY = (1 << 1),
+    YY_FLAG_WS_CLOSE = (1 << 2),
 } lcr_asr_flag_t;
 
 typedef struct lcr_lws {
@@ -89,7 +84,7 @@ int ws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, v
             	char tmp_msg[] = "{\"chunk_size\":[5,10,5],\"wav_name\":\"h5\",\"is_speaking\":true,\"chunk_interval\":10,\"itn\":false,\"mode\":\"2pass\",\"hotwords\":\"{\\\"阿里巴巴\\\":20,\\\"hello world\\\":40}\"}";
             	// 前面LWS_PRE个字节必须留给LWS
             	char all_msg[LWS_PRE + strlen(tmp_msg)];
-            	int pre_len = sprintf(&all_msg[LWS_PRE], tmp_msg);
+            	int pre_len = sprintf(&all_msg[LWS_PRE], "%s", tmp_msg);
 
                 switch_set_flag_locked(asr_obj, YY_FLAG_WS_READY);
                 asr_obj->msg_count++;
@@ -98,8 +93,8 @@ int ws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, v
             	lws_write(wsi, (unsigned char*)&all_msg[LWS_PRE], pre_len, LWS_WRITE_TEXT);
             }
             if ( switch_test_flag(asr_obj, YY_FLAG_WS_CLOSE) ) {
-            	char close_msg[] = "{\"chunk_size\":[5,10,5],\"wav_name\":\"h5\",\"is_speaking\":false,\"chunk_interval\":10,\"mode\":\"2pass\"}";
-            	lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL,(unsigned char *)close_msg, strlen(close_msg));
+//            	char close_msg[] = "{\"chunk_size\":[5,10,5],\"wav_name\":\"h5\",\"is_speaking\":false,\"chunk_interval\":10,\"mode\":\"2pass\"}";
+//            	lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL,(unsigned char *)close_msg, strlen(close_msg));
                 return -1;
             }
 //		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "ws_callback LWS_CALLBACK_CLIENT_WRITEABLE Tx: %s\n", msg);
@@ -119,6 +114,9 @@ int ws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, v
 SWITCH_DECLARE(switch_status_t) get_ws_rx_text(switch_buffer_t *buffer ,char *in){
     /* for JSON result parse*/
     cJSON *json_result = NULL, *cursor = NULL;
+    if ( buffer == NULL ) {
+        return SWITCH_STATUS_FALSE;
+    }
     // 清空text_buffer之前的值
     switch_buffer_zero(buffer);
     json_result = cJSON_Parse(in);
@@ -233,8 +231,14 @@ static switch_status_t asr_close(switch_asr_handle_t *ah, switch_asr_flag_t *fla
         switch_buffer_destroy(&asr_obj->pr_obj.text_buffer);
     }
     if (asr_obj->lws_obj.g_wsi && switch_test_flag(&asr_obj->pr_obj, YY_FLAG_WS_READY)){
+        char tmp_msg[] = "{\"is_speaking\":false}";
+        // 前面LWS_PRE个字节必须留给LWS
+        char all_msg[LWS_PRE + strlen(tmp_msg)];
+        int pre_len = sprintf(&all_msg[LWS_PRE], "%s", tmp_msg);
+
         switch_set_flag_locked(&asr_obj->pr_obj, YY_FLAG_WS_CLOSE);
-        lws_callback_on_writable(asr_obj->lws_obj.g_wsi);
+        // 通过WebSocket发送文本消息
+        lws_write(asr_obj->lws_obj.g_wsi, (unsigned char*)&all_msg[LWS_PRE], pre_len, LWS_WRITE_TEXT);
     	// switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "asr_closexxxxxxxxx \n");
     }
     switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "asr_close \n");
@@ -402,7 +406,7 @@ SWITCH_MODULE_RUNTIME_FUNCTION(mod_lcr_asr_runtime)
 	while(1)
 	{
 	    switch_yield(100);
-	    lws_service( lws_context_obj, 0 );
+	    lws_service( lws_context_obj, 100 );
 	    return SWITCH_STATUS_CONTINUE;
 	}
 	return SWITCH_STATUS_TERM;

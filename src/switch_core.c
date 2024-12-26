@@ -82,6 +82,7 @@ SWITCH_DECLARE_DATA switch_directories SWITCH_GLOBAL_dirs = { 0 };
 SWITCH_DECLARE_DATA switch_filenames SWITCH_GLOBAL_filenames = { 0 };
 
 /* The main runtime obj we keep this hidden for ourselves */
+//在switch_core_pvt.h中定义了外部访问
 struct switch_runtime runtime = { 0 };
 static void switch_load_core_config(const char *file);
 

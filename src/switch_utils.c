@@ -2854,6 +2854,14 @@ SWITCH_DECLARE(unsigned int) switch_separate_string(char *buf, char delim, char 
 	return (delim == ' ' ? separate_string_blank_delim(buf, array, arraylen) : separate_string_char_delim(buf, delim, array, arraylen));
 }
 
+/**
+ * 假设输入字符串为 "C:\\Users\\Admin\\Documents"：
+ * 第一次循环处理分隔符 /，没有找到，所以 ret 不变。
+ * 第二次循环处理分隔符 \，依次找到 \U, \A, \D，最终 ret 指向 "Documents"。
+ * 因此，返回值为 "Documents"。
+ * @param in
+ * @return
+ */
 SWITCH_DECLARE(const char *) switch_cut_path(const char *in)
 {
 	const char *p, *ret = in;

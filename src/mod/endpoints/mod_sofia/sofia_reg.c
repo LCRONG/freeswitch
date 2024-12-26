@@ -2301,8 +2301,16 @@ uint8_t sofia_reg_handle_register_token(nua_t *nua, sofia_profile_t *profile, nu
 	return (uint8_t) r;
 }
 
-
-
+/**
+ * 从客户端发来的 SIP 注册请求（REGISTER 请求） ，i 通常代表 "incoming"，即“传入”或“接收”的意
+ * @param nua
+ * @param profile
+ * @param nh
+ * @param sofia_private_p
+ * @param sip
+ * @param de
+ * @param tags
+ */
 void sofia_reg_handle_sip_i_register(nua_t *nua, sofia_profile_t *profile, nua_handle_t *nh, sofia_private_t **sofia_private_p, sip_t const *sip,
 									 sofia_dispatch_event_t *de,
 									 tagi_t tags[])

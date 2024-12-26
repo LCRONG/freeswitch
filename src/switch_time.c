@@ -654,7 +654,10 @@ SWITCH_DECLARE(void) switch_sleep(switch_interval_time_t t)
 	do_sleep(t);
 }
 
-
+/**
+ * 根据运行时的状态和条件，决定当前线程是主动让出 CPU、休眠 1 秒，
+ * 还是在条件变量上等待。它的设计目的是为了在多线程环境中有效地管理线程的执行和调度，确保资源的合理使用和线程的协调。
+ */
 SWITCH_DECLARE(void) switch_cond_next(void)
 {
 	if (runtime.tipping_point && globals.timer_count >= runtime.tipping_point) {

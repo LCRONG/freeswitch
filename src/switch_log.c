@@ -647,6 +647,7 @@ SWITCH_DECLARE(void) switch_log_meta_vprintf(switch_text_channel_t channel, cons
 		}
 	}
 
+	//发事件不写日志
 	if (channel == SWITCH_CHANNEL_ID_EVENT) {
 		switch_event_t *event;
 		if (switch_event_running() == SWITCH_STATUS_SUCCESS && switch_event_create(&event, SWITCH_EVENT_LOG) == SWITCH_STATUS_SUCCESS) {

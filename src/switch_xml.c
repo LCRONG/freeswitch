@@ -355,6 +355,14 @@ SWITCH_DECLARE(void *) switch_xml_get_binding_user_data(switch_xml_binding_t *bi
 	return binding->user_data;
 }
 
+/**
+ * 绑定一个搜索函数到BINDINGS中并返回node点
+ * @param function 一个指向 XML 搜索函数的指针，后续代码会把它绑定到某个数据结构。
+ * @param sections 与 XML 的节相关的数据，可能用于标识 XML 文档的特定部分。
+ * @param user_data 用户自定义的数据指针，用于传递和此次绑定相关的额外信息。
+ * @param ret_binding 一个指向指针的指针，用于返回新创建的绑定数据结构。
+ * @return
+ */
 SWITCH_DECLARE(switch_status_t) switch_xml_bind_search_function_ret(switch_xml_search_function_t function,
 																	switch_xml_section_t sections, void *user_data, switch_xml_binding_t **ret_binding)
 {

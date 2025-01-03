@@ -533,7 +533,7 @@ int main(int argc, char *argv[])
 	for (x = 0; x < argc; x++) {
 		local_argv[x] = argv[x];
 	}
-
+	//获取环境变量中的参数到local_argv里
 	if ((opts = getenv("FREESWITCH_OPTS"))) {
 		strncpy(opts_str, opts, sizeof(opts_str) - 1);
 		i = switch_separate_string(opts_str, ' ', arg_argv, (sizeof(arg_argv) / sizeof(arg_argv[0])));
@@ -541,7 +541,7 @@ int main(int argc, char *argv[])
 			local_argv[local_argc++] = arg_argv[x];
 		}
 	}
-
+	//判断启动命令是不是freeswitchd
 	if (local_argv[0] && strstr(local_argv[0], "freeswitchd")) {
 		nc = SWITCH_TRUE;
 	}

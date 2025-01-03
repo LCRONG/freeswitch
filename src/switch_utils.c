@@ -2832,6 +2832,14 @@ static unsigned int separate_string_blank_delim(char *buf, char **array, unsigne
 	return count;
 }
 
+/**
+ * 字符串分割
+ * @param buf 原始字符串 a b c
+ * @param delim 分割符
+ * @param array 输出数组
+ * @param arraylen 数组长度
+ * @return
+ */
 SWITCH_DECLARE(unsigned int) switch_separate_string(char *buf, char delim, char **array, unsigned int arraylen)
 {
 	if (!buf || !array || !arraylen) {

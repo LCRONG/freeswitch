@@ -145,6 +145,7 @@ fspr_status_t switch_apr_queue_push(switch_apr_queue_t *queue, void *data)
         return rv;
     }
 
+	//如果队列是满的就阻塞队列
     if (apr_queue_full(queue)) {
         if (!queue->terminated) {
             queue->full_waiters++;
@@ -175,6 +176,10 @@ fspr_status_t switch_apr_queue_push(switch_apr_queue_t *queue, void *data)
     queue->in = (queue->in + 1) % queue->bounds;
     queue->nelts++;
 
+	/*
+	 * 通知等待线程
+	 * 试图执行出队列（pop）的线程由于没有元素可取，只能等待，现在有新元素入队了，就通知它们可以继续执行出队列操作，去消费新进入队列的 “套接字” 资源了 。
+	 */
     if (queue->empty_waiters) {
         Q_DBG("sig !empty", queue);
         rv = fspr_thread_cond_signal(queue->not_empty);

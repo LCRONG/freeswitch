@@ -39,6 +39,7 @@
 
 #define DEBUG_THREAD_POOL
 
+//在switch_core_pvt.h中定义了外部访问
 struct switch_session_manager session_manager;
 
 SWITCH_DECLARE(void) switch_core_session_set_dmachine(switch_core_session_t *session, switch_ivr_dmachine_t *dmachine, switch_digit_action_target_t target)
@@ -1888,7 +1889,11 @@ static switch_status_t check_queue(void)
 	return status;
 }
 
-
+/**
+ * 将数据丢到待启动线程队列，等待异步启动新线程
+ * @param tdp 线程要执行的函数指针和一些用户数据
+ * @return
+ */
 SWITCH_DECLARE(switch_status_t) switch_thread_pool_launch_thread(switch_thread_data_t **tdp)
 {
 	switch_status_t status = SWITCH_STATUS_SUCCESS;
@@ -1896,7 +1901,13 @@ SWITCH_DECLARE(switch_status_t) switch_thread_pool_launch_thread(switch_thread_d
 
 	switch_assert(tdp);
 
+	/*
+	 * 将*tdp的地址值赋值到td变量中
+	 */
 	td = *tdp;
+	/*
+	 * 外部的指针变量存储的地址值就为空，那么就不能访问实际的内容了
+	 */
 	*tdp = NULL;
 
 	status = switch_queue_push(session_manager.thread_queue, td);

@@ -268,16 +268,26 @@ static int switch_events_match(switch_event_t *event, switch_event_node_t *node)
 	return match;
 }
 
-
+/**
+ * 新线程执行的函数
+ * @param thread 线程体
+ * @param obj 用户数据
+ * @return
+ */
 static void *SWITCH_THREAD_FUNC switch_event_deliver_thread(switch_thread_t *thread, void *obj)
 {
 	switch_event_t *event = (switch_event_t *) obj;
 
+	//这个才是事件投递入口
 	switch_event_deliver(&event);
 
 	return NULL;
 }
 
+/**
+ * 创建一个新的线程并丢到线程池中
+ * @param event 事件内容
+ */
 static void switch_event_deliver_thread_pool(switch_event_t **event)
 {
 	switch_thread_data_t *td;
@@ -286,10 +296,15 @@ static void switch_event_deliver_thread_pool(switch_event_t **event)
 	switch_assert(td);
 
 	td->alloc = 1;
+	//新线程启动时会执行这个函数
 	td->func = switch_event_deliver_thread;
 	td->obj = *event;
 	td->pool = NULL;
 
+	/*
+	 * 所有权转移，外部的指针变量不再有访问0x123地址指向的内容，因为将路标都抹去了
+	 * *event的值是0x123地址
+	 */
 	*event = NULL;
 
 	switch_thread_pool_launch_thread(&td);
@@ -1998,6 +2013,15 @@ SWITCH_DECLARE(void) switch_event_prep_for_delivery_detailed(const char *file, c
 
 }
 
+/**
+ * 这个就是提供给外部调用的投递事件函数
+ * @param file
+ * @param func
+ * @param line
+ * @param event
+ * @param user_data
+ * @return
+ */
 SWITCH_DECLARE(switch_status_t) switch_event_fire_detailed(const char *file, const char *func, int line, switch_event_t **event, void *user_data)
 {
 

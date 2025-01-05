@@ -27,6 +27,7 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_test_load)
 	*module_interface = switch_loadable_module_create_module_interface(pool, modname);
 
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "LCR Hello World!\n");
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_CRIT, "CRIT LCR Hello World!\n");
 
 	/* indicate that the module should continue to be loaded */
 	return SWITCH_STATUS_SUCCESS;

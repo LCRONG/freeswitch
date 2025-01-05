@@ -49,6 +49,7 @@ struct switch_event_node {
 	/*! the id of the node */
 	char *id;
 	/*! the event id enumeration to bind to */
+	/* 事件类型，例如 SWITCH_EVENT_CHANNEL_CREATE、 SWITCH_EVENT_LOG等*/
 	switch_event_types_t event_id;
 	/*! the event subclass to bind to for custom events */
 	char *subclass_name;
@@ -285,7 +286,7 @@ static void *SWITCH_THREAD_FUNC switch_event_deliver_thread(switch_thread_t *thr
 }
 
 /**
- * 创建一个新的线程并丢到线程池中
+ * 创建一个新的线程对象并丢到线程池中
  * @param event 事件内容
  */
 static void switch_event_deliver_thread_pool(switch_event_t **event)

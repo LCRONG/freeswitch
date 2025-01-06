@@ -1659,7 +1659,7 @@ static switch_status_t switch_loadable_module_unprocess(switch_loadable_module_t
  */
 static switch_status_t switch_loadable_module_load_file(char *path, char *filename, switch_bool_t global, switch_loadable_module_t **new_module)
 {
-	/* */
+	/* 记录模块加载后的一些属性，这个结构体就是放在hash中的 */
 	switch_loadable_module_t *module = NULL;
 	switch_dso_lib_t dso = NULL;
 	fspr_status_t status = SWITCH_STATUS_SUCCESS;

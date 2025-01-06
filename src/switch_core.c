@@ -1803,7 +1803,8 @@ SWITCH_DECLARE(switch_status_t) switch_core_thread_set_cpu_affinity(int cpu)
 
 SWITCH_DECLARE(int) switch_core_test_flag(int flag)
 {
-	return switch_test_flag((&runtime), flag); }
+	return switch_test_flag((&runtime), flag);
+}
 
 /**
  * 核心启动，实例化runtime并赋值

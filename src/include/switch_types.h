@@ -2610,6 +2610,7 @@ typedef uint32_t switch_module_flag_t;
 
 typedef struct switch_loadable_module_function_table {
 	int switch_api_version;
+	/* 一看就知道是指向模块的load函数指针了 */
 	switch_module_load_t load;
 	switch_module_shutdown_t shutdown;
 	switch_module_runtime_t runtime;

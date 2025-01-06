@@ -195,6 +195,14 @@ SWITCH_DECLARE(switch_status_t) switch_strftime_nocheck(char *s, switch_size_t *
 	return fspr_strftime(s, retsize, max, format, (fspr_time_exp_t *) tm);
 }
 
+/**
+ * 格式化字符串，并将字符串写入到内存中，就是变量赋值
+ * @param buf 指向目标缓冲区的指针，格式化后的字符串会输出到这个缓冲区中。
+ * @param len 目标缓冲区的大小，用于防止缓冲区溢出。
+ * @param format 格式字符串，里面包含普通字符和格式化占位符，例如%d、%s 等，用来指定输出的格式。
+ * @param ...
+ * @return
+ */
 SWITCH_DECLARE(int) switch_snprintf(char *buf, switch_size_t len, const char *format, ...)
 {
 	va_list ap;
@@ -539,6 +547,13 @@ SWITCH_DECLARE(switch_status_t) switch_dir_make(const char *path, switch_fileper
 	return fspr_dir_make(path, perm, pool);
 }
 
+/**
+ * 递归地创建目录
+ * @param path 需要创建的目录路径
+ * @param perm 用于指定创建目录时赋予目录的文件权限，不同操作系统对文件权限有不同的设置方式，这个类型应该是自定义的用于表示权限的类型。
+ * @param pool
+ * @return
+ */
 SWITCH_DECLARE(switch_status_t) switch_dir_make_recursive(const char *path, switch_fileperms_t perm, switch_memory_pool_t *pool)
 {
 	return fspr_dir_make_recursive(path, perm, pool);

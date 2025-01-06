@@ -2477,6 +2477,13 @@ SWITCH_DECLARE(switch_status_t) switch_xml_destroy(void)
 	return status;
 }
 
+/**
+ * 打开xml的配置文件
+ * @param file_path
+ * @param node
+ * @param params
+ * @return
+ */
 SWITCH_DECLARE(switch_xml_t) switch_xml_open_cfg(const char *file_path, switch_xml_t *node, switch_event_t *params)
 {
 	switch_xml_t xml = NULL, cfg = NULL;

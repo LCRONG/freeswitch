@@ -630,6 +630,9 @@ SWITCH_DECLARE(switch_thread_t *) switch_core_launch_thread(switch_thread_start_
 	return thread;
 }
 
+/**
+ * 就是对SWITCH_GLOBAL_dirs全局变量分配内存同时初始化
+ */
 SWITCH_DECLARE(void) switch_core_set_globals(void)
 {
 #define BUFSIZE 1024
@@ -1183,7 +1186,10 @@ SWITCH_DECLARE(int32_t) change_user_group(const char *user, const char *group)
 #endif
 	return 0;
 }
-
+/**
+ * 运行时循环
+ * @param bg 是否后台启动
+ */
 SWITCH_DECLARE(void) switch_core_runtime_loop(int bg)
 {
 #ifdef WIN32
@@ -1198,12 +1204,14 @@ SWITCH_DECLARE(void) switch_core_runtime_loop(int bg)
 			WaitForSingleObject(shutdown_event, INFINITE);
 		}
 #else
+		/* 在unix类平台就是无限循环*/
 		while (runtime.running) {
 			switch_yield(1000000);
 		}
 #endif
 	} else {
 		/* wait for console input */
+		/* 启动一个控制台接收用户的键盘输入并打印系统运行的信息*/
 		switch_console_loop();
 	}
 }
@@ -1449,6 +1457,10 @@ SWITCH_DECLARE(switch_bool_t) switch_check_network_list_ip_token(const char *ip_
 	return switch_check_network_list_ip_port_token(ip_str, 0, list_name, token);
 }
 
+/**
+ * 加载系统的网络，同时也在这里加载acl.conf.xml
+ * @param reload
+ */
 SWITCH_DECLARE(void) switch_load_network_lists(switch_bool_t reload)
 {
 	switch_xml_t xml = NULL, x_lists = NULL, x_list = NULL, x_node = NULL, cfg = NULL;
@@ -1791,10 +1803,15 @@ SWITCH_DECLARE(switch_status_t) switch_core_thread_set_cpu_affinity(int cpu)
 
 SWITCH_DECLARE(int) switch_core_test_flag(int flag)
 {
-	return switch_test_flag((&runtime), flag);
-}
+	return switch_test_flag((&runtime), flag); }
 
-
+/**
+ * 核心启动，实例化runtime并赋值
+ * @param flags switch_core_flag_t 就是一个整数
+ * @param console
+ * @param err
+ * @return
+ */
 SWITCH_DECLARE(switch_status_t) switch_core_init(switch_core_flag_t flags, switch_bool_t console, const char **err)
 {
 	switch_uuid_t uuid;
@@ -2440,6 +2457,13 @@ switch_status_t switch_core_sqldb_init(const char **err)
 	return SWITCH_STATUS_SUCCESS;
 }
 
+/**
+ * 初始化系统并加载各种模块
+ * @param flags 就是里面包含了多个开关变量 switch_core_flag_t
+ * @param console 是否后台启动
+ * @param err
+ * @return
+ */
 SWITCH_DECLARE(switch_status_t) switch_core_init_and_modload(switch_core_flag_t flags, switch_bool_t console, const char **err)
 {
 	switch_event_t *event;
@@ -2449,6 +2473,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_init_and_modload(switch_core_flag_t 
 #include "cc.h"
 
 
+	/* 实例化runtime并赋值 */
 	if (switch_core_init(flags, console, err) != SWITCH_STATUS_SUCCESS) {
 		return SWITCH_STATUS_GENERR;
 	}
@@ -2461,6 +2486,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_init_and_modload(switch_core_flag_t 
 	runtime.runlevel++;
 	runtime.events_use_dispatch = 1;
 
+	/* 一看就知道对系统信号的处理*/
 	switch_core_set_signal_handlers();
 	switch_load_network_lists(SWITCH_FALSE);
 
@@ -2468,6 +2494,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_init_and_modload(switch_core_flag_t 
 
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_CONSOLE, "Bringing up environment.\n");
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_CONSOLE, "Loading Modules.\n");
+	/* 加载模块 */
 	if (switch_loadable_module_init(SWITCH_TRUE) != SWITCH_STATUS_SUCCESS) {
 		*err = "Cannot load modules";
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_CONSOLE, "Error: %s\n", *err);

@@ -2015,7 +2015,7 @@ SWITCH_DECLARE(void) switch_event_prep_for_delivery_detailed(const char *file, c
 }
 
 /**
- * 这个就是提供给外部调用的投递事件函数
+ * 这个就是提供给外部调用的投递事件函数,执行发送动作的
  * @param file
  * @param func
  * @param line

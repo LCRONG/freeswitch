@@ -530,22 +530,27 @@ int main(int argc, char *argv[])
 #endif
 #endif
 
+	/* 遍历命令行传入的参数 */
 	for (x = 0; x < argc; x++) {
 		local_argv[x] = argv[x];
 	}
-	//获取环境变量中的参数到local_argv里
+	/* 获取环境变量中的参数到local_argv里 */
 	if ((opts = getenv("FREESWITCH_OPTS"))) {
+		/* 将opts内容复制到opts_str,减一的作用是不复制结束符*/
 		strncpy(opts_str, opts, sizeof(opts_str) - 1);
+		/* 很明显就是将字符串分割成数组 */
 		i = switch_separate_string(opts_str, ' ', arg_argv, (sizeof(arg_argv) / sizeof(arg_argv[0])));
+		/* 将命令行的参数和环境变量的参数合并到一起*/
 		for (x = 0; x < i; x++) {
 			local_argv[local_argc++] = arg_argv[x];
 		}
 	}
-	//判断启动命令是不是freeswitchd
+	/* 判断启动命令是不是freeswitchd */
 	if (local_argv[0] && strstr(local_argv[0], "freeswitchd")) {
 		nc = SWITCH_TRUE;
 	}
 
+	//开始遍历参数，处理参数
 	for (x = 1; x < local_argc; x++) {
 
 		if (switch_strlen_zero(local_argv[x]))
@@ -828,6 +833,7 @@ int main(int argc, char *argv[])
 				return 255;
 			}
 
+			/* 在switch_types.h中声明了 extern SWITCH_GLOBAL_dirs*/
 			SWITCH_GLOBAL_dirs.run_dir = (char *) malloc(strlen(local_argv[x]) + 1);
 			if (!SWITCH_GLOBAL_dirs.run_dir) {
 				fprintf(stderr, "Allocation error\n");
@@ -1159,6 +1165,7 @@ int main(int argc, char *argv[])
 	}
 #endif
 
+	/* 就是对SWITCH_GLOBAL_dirs全局变量初始化 */
 	switch_core_set_globals();
 
 	pid = getpid();
@@ -1198,6 +1205,7 @@ int main(int argc, char *argv[])
 
 	switch_file_write(fd, pid_buffer, &pid_len);
 
+	/* 重点来了，这就是加载各种模块的函数*/
 	if (switch_core_init_and_modload(flags, nc ? SWITCH_FALSE : SWITCH_TRUE, &err) != SWITCH_STATUS_SUCCESS) {
 		fprintf(stderr, "Cannot Initialize [%s]\n", err);
 		return 255;
@@ -1227,6 +1235,7 @@ int main(int argc, char *argv[])
 
 	switch_core_runtime_loop(nc);
 
+	/* 后面这些就是kill了后的操作了 */
 	destroy_status = switch_core_destroy();
 
 	switch_file_close(fd);

@@ -61,7 +61,7 @@ typedef struct switch_codec_node_s {
 	struct switch_codec_node_s *next;
 } switch_codec_node_t;
 
-
+/* 最终加载后模块的一些属性 */
 struct switch_loadable_module {
 	char *key;
 	char *filename;
@@ -98,11 +98,14 @@ struct switch_loadable_module_container {
 	switch_hash_t *limit_hash;
 	switch_hash_t *database_hash;
 	switch_hash_t *secondary_recover_hash;
+	/* 防止多线程访问 */
 	switch_mutex_t *mutex;
 	switch_thread_rwlock_t *chat_rwlock;
+	/* 这是一个内存池 */
 	switch_memory_pool_t *pool;
 };
 
+/**/
 static struct switch_loadable_module_container loadable_modules;
 static switch_status_t do_shutdown(switch_loadable_module_t *module, switch_bool_t shutdown, switch_bool_t unload, switch_bool_t fail_if_busy,
 								   const char **err);
@@ -154,16 +157,26 @@ static void switch_loadable_module_runtime(void)
 	switch_mutex_unlock(loadable_modules.mutex);
 }
 
+/**
+ *
+ * @param key 模块文件名
+ * @param new_module
+ * @param event_hash
+ * @return
+ */
 static switch_status_t switch_loadable_module_process(char *key, switch_loadable_module_t *new_module, switch_hash_t *event_hash)
 {
 	switch_event_t *event;
 	int added = 0;
 
+	/* 从new_module->pool内存池中获取内存并存放key里的东西*/
 	new_module->key = switch_core_strdup(new_module->pool, key);
 
 	switch_mutex_lock(loadable_modules.mutex);
+	/* 插入到hash表中记录该模块已被加载 */
 	switch_core_hash_insert(loadable_modules.module_hash, key, new_module);
 
+	/* 记录该模块有没有实现endpoint_interface接口，如果实现了也记录到loadable_modules.endpoint_hash 哈希表中*/
 	if (new_module->module_interface->endpoint_interface) {
 		const switch_endpoint_interface_t *ptr;
 		for (ptr = new_module->module_interface->endpoint_interface; ptr; ptr = ptr->next) {
@@ -179,6 +192,7 @@ static switch_status_t switch_loadable_module_process(char *key, switch_loadable
 					switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "filename", new_module->filename);
 					
 					if (!event_hash) {
+						/* 发送事件 */
 						switch_event_fire(&event);
 					} else {
 						switch_core_hash_insert_pointer(event_hash, (const void*)event);
@@ -1630,12 +1644,22 @@ static switch_status_t switch_loadable_module_unprocess(switch_loadable_module_t
 	switch_mutex_unlock(loadable_modules.mutex);
 
 	return SWITCH_STATUS_SUCCESS;
-
 }
 
-
+/**
+ * 模块加载流程
+ * 1.找到模块对应的动态库文件
+ * 2.打开并找到符号表
+ * 3.执行模块中的load函数
+ * @param path
+ * @param filename
+ * @param global
+ * @param new_module
+ * @return
+ */
 static switch_status_t switch_loadable_module_load_file(char *path, char *filename, switch_bool_t global, switch_loadable_module_t **new_module)
 {
+	/* */
 	switch_loadable_module_t *module = NULL;
 	switch_dso_lib_t dso = NULL;
 	fspr_status_t status = SWITCH_STATUS_SUCCESS;
@@ -1644,6 +1668,7 @@ static switch_status_t switch_loadable_module_load_file(char *path, char *filena
 	char *struct_name = NULL;
 	switch_module_load_t load_func_ptr = NULL;
 	int loading = 1;
+	/* module_interface 这个变量就是用于记录这个模块实现了什么功能*/
 	switch_loadable_module_interface_t *module_interface = NULL;
 	char *derr = NULL;
 	const char *err = NULL;
@@ -1710,6 +1735,7 @@ static switch_status_t switch_loadable_module_load_file(char *path, char *filena
 
 		if (interface_struct_handle) {
 			mod_interface_functions = interface_struct_handle;
+			/* 这里是将load函数指针给到另一个变量 */
 			load_func_ptr = mod_interface_functions->load;
 		}
 
@@ -1718,6 +1744,7 @@ static switch_status_t switch_loadable_module_load_file(char *path, char *filena
 			break;
 		}
 
+		/* 这里就是执行了模块的load函数了 */
 		status = load_func_ptr(&module_interface, pool);
 
 		if (status != SWITCH_STATUS_SUCCESS && status != SWITCH_STATUS_NOUNLOAD) {
@@ -1782,6 +1809,17 @@ SWITCH_DECLARE(switch_status_t) switch_loadable_module_load_module(const char *d
 	return switch_loadable_module_load_module_ex(dir, fname, runtime, SWITCH_FALSE, err, SWITCH_LOADABLE_MODULE_TYPE_COMMON, NULL);
 }
 
+/**
+ * 实际加载模块执行的函数
+ * @param dir
+ * @param fname
+ * @param runtime
+ * @param global
+ * @param err
+ * @param type
+ * @param event_hash
+ * @return
+ */
 static switch_status_t switch_loadable_module_load_module_ex(const char *dir, const char *fname, switch_bool_t runtime, switch_bool_t global, const char **err, switch_loadable_module_type_t type, switch_hash_t *event_hash)
 {
 	switch_size_t len = 0;
@@ -1798,6 +1836,7 @@ static switch_status_t switch_loadable_module_load_module_ex(const char *dir, co
 
 	*err = "";
 
+	/* 复制文件名 */
 	if ((file = switch_core_strdup(loadable_modules.pool, fname)) == 0) {
 		*err = "allocation error";
 		return SWITCH_STATUS_FALSE;
@@ -1821,14 +1860,17 @@ static switch_status_t switch_loadable_module_load_module_ex(const char *dir, co
 	}
 
 
+	/* 判断模块是否已被加载 */
 	if (switch_core_hash_find_locked(loadable_modules.module_hash, file, loadable_modules.mutex)) {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "Module %s Already Loaded!\n", file);
 		*err = "Module already loaded";
 		status = SWITCH_STATUS_FALSE;
 	} else if ((status = switch_loadable_module_load_file(path, file, global, &new_module)) == SWITCH_STATUS_SUCCESS) {
+		/* 加载模块成功后 */
 		new_module->type = type;
 
 		if ((status = switch_loadable_module_process(file, new_module, event_hash)) == SWITCH_STATUS_SUCCESS && runtime) {
+			/* 这个就是启动一个新线程去运行模块的runtime函数了*/
 			if (new_module->switch_module_runtime) {
 				new_module->thread = switch_core_launch_thread(switch_loadable_module_exec, new_module, new_module->pool);
 			}
@@ -2078,6 +2120,11 @@ static void switch_loadable_module_path_init()
 }
 #endif
 
+/**
+ * 加载模块的函数
+ * @param autoload
+ * @return
+ */
 SWITCH_DECLARE(switch_status_t) switch_loadable_module_init(switch_bool_t autoload)
 {
 
@@ -2116,6 +2163,7 @@ SWITCH_DECLARE(switch_status_t) switch_loadable_module_init(switch_bool_t autolo
 	switch_loadable_module_path_init();
 #endif
 
+	/* 初始化hash具体是初始化了什么*/
 	switch_core_hash_init(&loadable_modules.module_hash);
 	switch_core_hash_init_nocase(&loadable_modules.endpoint_hash);
 	switch_core_hash_init_nocase(&loadable_modules.codec_hash);
@@ -2145,6 +2193,12 @@ SWITCH_DECLARE(switch_status_t) switch_loadable_module_init(switch_bool_t autolo
 		Modules loading procedure generates events used by sqldb.
 		This is why we should hold those events (storing in the event_hash) not firing them until sqldb is ready.
 	*/
+
+	/*
+	 * switch_core_sqldb_init() 尚未准备就绪，它会在 pre_load_modules.conf 文件中的模块启动之后执行。
+	 * 模块加载过程会生成供 sqldb 使用的事件。
+	 * 这就是为什么我们要暂存这些事件（存储在 event_hash 中），直到 sqldb 准备好才触发它们。
+	 */
 	switch_core_hash_init(&event_hash);
 
 	/* 
@@ -2152,6 +2206,11 @@ SWITCH_DECLARE(switch_status_t) switch_loadable_module_init(switch_bool_t autolo
 		Do not pre-load modules which may use databases,
 		use appropriate section.
 	*/
+	/*
+	 * 预加载核心模块。
+	 * 请勿预加载可能使用数据库的模块，
+	 * 请使用合适的部分。
+	 */
 	switch_loadable_module_load_module_ex("", "CORE_SOFTTIMER_MODULE", SWITCH_FALSE, SWITCH_FALSE, &err, SWITCH_LOADABLE_MODULE_TYPE_COMMON, event_hash);
 	switch_loadable_module_load_module_ex("", "CORE_PCM_MODULE", SWITCH_FALSE, SWITCH_FALSE, &err, SWITCH_LOADABLE_MODULE_TYPE_COMMON, event_hash);
 	switch_loadable_module_load_module_ex("", "CORE_SPEEX_MODULE", SWITCH_FALSE, SWITCH_FALSE, &err, SWITCH_LOADABLE_MODULE_TYPE_COMMON, event_hash);
@@ -2160,6 +2219,11 @@ SWITCH_DECLARE(switch_status_t) switch_loadable_module_init(switch_bool_t autolo
 		Loading pre-load modules.
 		Database modules must be loaded here.
 	*/
+	/*
+	 * precf = pre_load_modules.conf
+	 * 正在加载预加载模块。
+	 * 数据库模块必须在此处加载。
+	 */
 	if ((xml = switch_xml_open_cfg(precf, &cfg, NULL))) {
 		switch_xml_t mods, ld;
 		if ((mods = switch_xml_child(cfg, "modules"))) {
@@ -2225,6 +2289,7 @@ SWITCH_DECLARE(switch_status_t) switch_loadable_module_init(switch_bool_t autolo
 #endif
 
 	/* Loading common modules */
+	/* 正在加载通用模块 cf = modules.conf */
 	if ((xml = switch_xml_open_cfg(cf, &cfg, NULL))) {
 		switch_xml_t mods, ld;
 		if ((mods = switch_xml_child(cfg, "modules"))) {
@@ -2258,6 +2323,7 @@ SWITCH_DECLARE(switch_status_t) switch_loadable_module_init(switch_bool_t autolo
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_CONSOLE, "open of %s failed\n", cf);
 	}
 
+	/* pcf = post_load_modules.conf */
 	if ((xml = switch_xml_open_cfg(pcf, &cfg, NULL))) {
 		switch_xml_t mods, ld;
 
@@ -2291,6 +2357,7 @@ SWITCH_DECLARE(switch_status_t) switch_loadable_module_init(switch_bool_t autolo
 		all = 1;
 	}
 
+	/* 如果没有找到可加载模块就尝试加载所有模块 */
 	if (all) {
 		if (fspr_dir_open(&module_dir_handle, SWITCH_GLOBAL_dirs.mod_dir, loadable_modules.pool) != APR_SUCCESS) {
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_CONSOLE, "Can't open directory: %s\n", SWITCH_GLOBAL_dirs.mod_dir);

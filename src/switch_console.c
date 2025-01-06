@@ -1043,6 +1043,12 @@ char *prompt(EditLine * e)
 	return prompt_str;
 }
 
+/**
+ * 控制台线程运行的函数
+ * @param thread
+ * @param obj
+ * @return
+ */
 static void *SWITCH_THREAD_FUNC console_thread(switch_thread_t *thread, void *obj)
 {
 	int count;
@@ -1075,6 +1081,7 @@ static void *SWITCH_THREAD_FUNC console_thread(switch_thread_t *thread, void *ob
 				}
 				assert(cmd != NULL);
 				history(myhistory, &ev, H_ENTER, line);
+				/* 执行键入的命令 */
 				running = switch_console_process(cmd);
 				el_deletestr(el, strlen(foo) + 1);
 				memset(foo, 0, strlen(foo));
@@ -1096,7 +1103,9 @@ static unsigned char complete(EditLine * el, int ch)
 	return switch_console_complete(lf->buffer, lf->cursor, switch_core_get_console(), NULL, NULL);
 }
 
-
+/**
+ * 控制台打印
+ */
 SWITCH_DECLARE(void) switch_console_loop(void)
 {
 	switch_thread_t *thread;

@@ -1677,6 +1677,7 @@ static switch_status_t switch_loadable_module_load_file(char *path, char *filena
 
 	switch_assert(path != NULL);
 
+	/* 这里分配模块对象(switch_loadable_module_t)的内存的 */
 	switch_core_new_memory_pool(&pool);
 	*new_module = NULL;
 
@@ -1758,6 +1759,7 @@ static switch_status_t switch_loadable_module_load_file(char *path, char *filena
 			break;
 		}
 
+		/* 看这里 */
 		if ((module = switch_core_alloc(pool, sizeof(switch_loadable_module_t))) == 0) {
 			abort();
 		}

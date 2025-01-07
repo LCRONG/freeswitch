@@ -525,6 +525,10 @@ static void check_presence(switch_core_session_t *session)
 
 
 
+/**
+ * 这是一个状态机
+ * @param session
+ */
 SWITCH_DECLARE(void) switch_core_session_run(switch_core_session_t *session)
 {
 	switch_channel_state_t state = CS_NEW, midstate = CS_DESTROY, endstate;

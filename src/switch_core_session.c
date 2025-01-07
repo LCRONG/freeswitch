@@ -1940,6 +1940,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_session_thread_pool_launch(switch_co
 		switch_set_flag(session, SSF_THREAD_STARTED);
 		td = switch_core_session_alloc(session, sizeof(*td));
 		td->obj = session;
+		/* 线程启动执行的函数 */
 		td->func = switch_core_session_thread;
 		status = switch_queue_push(session_manager.thread_queue, td);
 		check_queue();
@@ -1961,6 +1962,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_session_thread_launch(switch_core_se
 	}
 
 
+	/* 判断是否启用线程池 */
 	if (switch_test_flag((&runtime), SCF_SESSION_THREAD_POOL)) {
 		return switch_core_session_thread_pool_launch(session);
 	}
@@ -2367,17 +2369,21 @@ SWITCH_DECLARE(switch_core_session_t *) switch_core_session_request_xml(switch_e
 
 
 	if (!channel || !switch_channel_get_caller_profile(channel)) {
-		if (session) {
-			switch_core_session_destroy(&session);
-		}
+		if (session) { switch_core_session_destroy(&session); }
 	}
-
 
 	return session;
 }
 
-
-
+/**
+ * 创建一个session
+ * @param endpoint_interface
+ * @param direction
+ * @param originate_flags
+ * @param pool
+ * @param use_uuid
+ * @return
+ */
 SWITCH_DECLARE(switch_core_session_t *) switch_core_session_request_uuid(switch_endpoint_interface_t
 																		 *endpoint_interface,
 																		 switch_call_direction_t direction,
@@ -2437,6 +2443,7 @@ SWITCH_DECLARE(switch_core_session_t *) switch_core_session_request_uuid(switch_
 	}
 
 
+	/* 使用现有的内存池还是创建一个新的内存池*/
 	if (pool && *pool) {
 		usepool = *pool;
 		*pool = NULL;
@@ -2447,12 +2454,15 @@ SWITCH_DECLARE(switch_core_session_t *) switch_core_session_request_uuid(switch_
 	session = switch_core_alloc(usepool, sizeof(*session));
 	session->pool = usepool;
 
+	/* 看这个代码就感觉在循环引用*/
 	switch_core_memory_pool_set_data(session->pool, "__session", session);
 
+	/* 给session中的channel属性申请内存 */
 	if (switch_channel_alloc(&session->channel, direction, session->pool) != SWITCH_STATUS_SUCCESS) {
 		abort();
 	}
 
+	/* channel刚生成的状态就是 CS_NEW */
 	switch_channel_init(session->channel, session, CS_NEW, 0);
 
 	if (direction == SWITCH_CALL_DIRECTION_OUTBOUND) {
@@ -2462,6 +2472,7 @@ SWITCH_DECLARE(switch_core_session_t *) switch_core_session_request_uuid(switch_
 	/* The session *IS* the pool you may not alter it because you have no idea how
 	   its all private it will be passed to the thread run function */
 
+	/* 会话（session）就是这个内存池，你不可以修改它，因为你根本不清楚它内部的情况。它全是私有的，并且会被传递到线程运行函数中。 */
 	if (use_uuid) {
 		switch_set_string(session->uuid_str, use_uuid);
 	} else {
@@ -2469,6 +2480,7 @@ SWITCH_DECLARE(switch_core_session_t *) switch_core_session_request_uuid(switch_
 		switch_uuid_format(session->uuid_str, &uuid);
 	}
 
+	/* 初始化与session相关的各种变量、申请相关内存、初始化Mutex、锁、队列等操作。 */
 	switch_channel_set_variable(session->channel, "uuid", session->uuid_str);
 	switch_channel_set_variable(session->channel, "call_uuid", session->uuid_str);
 
@@ -2502,6 +2514,7 @@ SWITCH_DECLARE(switch_core_session_t *) switch_core_session_request_uuid(switch_
 	switch_queue_create(&session->private_event_queue_pri, SWITCH_EVENT_QUEUE_LEN, session->pool);
 
 	switch_mutex_lock(runtime.session_hash_mutex);
+	/* 将该Session对应的UUID记录到核心的哈希表中 */
 	switch_core_hash_insert(session_manager.session_table, session->uuid_str, session);
 	session->id = session_manager.session_id++;
 	session_manager.session_count++;

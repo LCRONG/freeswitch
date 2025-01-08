@@ -4430,6 +4430,23 @@ SWITCH_DECLARE(switch_status_t) switch_rtp_create(switch_rtp_t **new_rtp_session
 	return SWITCH_STATUS_SUCCESS;
 }
 
+/**
+ * 新建一个rtp session
+ * @param rx_host 本地的IP地址
+ * @param rx_port 本地的端口号
+ * @param tx_host 远端
+ * @param tx_port 远端
+ * @param payload
+ * @param samples_per_interval
+ * @param ms_per_packet
+ * @param flags
+ * @param timer_name
+ * @param err
+ * @param pool
+ * @param bundle_internal_port
+ * @param bundle_external_port
+ * @return
+ */
 SWITCH_DECLARE(switch_rtp_t *) switch_rtp_new(const char *rx_host,
 											  switch_port_t rx_port,
 											  const char *tx_host,
@@ -4988,7 +5005,10 @@ SWITCH_DECLARE(switch_status_t) switch_rtp_sync_stats(switch_rtp_t *rtp_session)
 	return SWITCH_STATUS_SUCCESS;
 }
 
-
+/**
+ * 销毁一个rtp session
+ * @param rtp_session
+ */
 SWITCH_DECLARE(void) switch_rtp_destroy(switch_rtp_t **rtp_session)
 {
 	void *pop;
@@ -5718,6 +5738,7 @@ static switch_status_t read_rtp_packet(switch_rtp_t *rtp_session, switch_size_t 
 	memset(&rtp_session->last_rtp_hdr, 0, sizeof(rtp_session->last_rtp_hdr));
 
 	if (poll_status == SWITCH_STATUS_SUCCESS) {
+		/* 从真正的Socket中读取数据。 */
 		status = switch_socket_recvfrom(rtp_session->from_addr, rtp_session->sock_input, 0, (void *) &rtp_session->recv_msg, bytes);
 	} else {
 		*bytes = 0;
@@ -7872,6 +7893,7 @@ SWITCH_DECLARE(switch_status_t) switch_rtp_zerocopy_read_frame(switch_rtp_t *rtp
 		return SWITCH_STATUS_FALSE;
 	}
 
+	/* 从底层的Socket中读取数据，并用读到的数据去填充frame指针指向的结构体*/
 	bytes = rtp_common_read(rtp_session, &frame->payload, &frame->pmap, &frame->flags, io_flags);
 
 	frame->data = RTP_BODY(rtp_session);

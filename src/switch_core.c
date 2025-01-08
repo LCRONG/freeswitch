@@ -1965,6 +1965,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_init(switch_core_flag_t flags, switc
 	switch_core_set_variable("data_dir", SWITCH_GLOBAL_dirs.data_dir);
 	switch_core_set_variable("localstate_dir", SWITCH_GLOBAL_dirs.localstate_dir);
 	switch_console_init(runtime.memory_pool);
+	/* 事件系统初始化 */
 	switch_event_init(runtime.memory_pool);
 	switch_channel_global_init(runtime.memory_pool);
 

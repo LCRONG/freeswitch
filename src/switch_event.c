@@ -312,6 +312,12 @@ static void switch_event_deliver_thread_pool(switch_event_t **event)
 
 }
 
+/**
+ * 消费事件队列
+ * @param thread
+ * @param obj
+ * @return
+ */
 static void *SWITCH_THREAD_FUNC switch_event_dispatch_thread(switch_thread_t *thread, void *obj)
 {
 	switch_queue_t *queue = (switch_queue_t *) obj;
@@ -344,6 +350,7 @@ static void *SWITCH_THREAD_FUNC switch_event_dispatch_thread(switch_thread_t *th
 			break;
 		}
 
+		/* 从事件队列中获取事件 */
 		if (switch_queue_pop(queue, &pop) != SWITCH_STATUS_SUCCESS) {
 			continue;
 		}
@@ -353,6 +360,7 @@ static void *SWITCH_THREAD_FUNC switch_event_dispatch_thread(switch_thread_t *th
 		}
 
 		event = (switch_event_t *) pop;
+		/* 开始分发事件 */
 		switch_event_deliver(&event);
 		switch_os_yield();
 	}
@@ -413,6 +421,10 @@ static switch_status_t switch_event_queue_dispatch_event(switch_event_t **eventp
 	return SWITCH_STATUS_SUCCESS;
 }
 
+/**
+ * 消费事件
+ * @param event
+ */
 SWITCH_DECLARE(void) switch_event_deliver(switch_event_t **event)
 {
 	switch_event_types_t e;
@@ -420,10 +432,12 @@ SWITCH_DECLARE(void) switch_event_deliver(switch_event_t **event)
 
 	if (SYSTEM_RUNNING) {
 		switch_thread_rwlock_rdlock(RWLOCK);
+		/* 判断所有的事件中有哪些事件被哪些节点订阅了，如果有节点订阅，则调用订阅者提供的callback */
 		for (e = (*event)->event_id;; e = SWITCH_EVENT_ALL) {
 			for (node = EVENT_NODES[e]; node; node = node->next) {
 				if (switch_events_match(*event, node)) {
 					(*event)->bind_user_data = node->user_data;
+					/* 订阅者的回调函数 */
 					node->callback(*event);
 				}
 			}
@@ -662,7 +676,10 @@ static void check_dispatch(void)
 }
 
 
-
+/**
+ * 启动事件分发的线程
+ * @param max
+ */
 SWITCH_DECLARE(void) switch_event_launch_dispatch_threads(uint32_t max)
 {
 	switch_threadattr_t *thd_attr;
@@ -690,6 +707,7 @@ SWITCH_DECLARE(void) switch_event_launch_dispatch_threads(uint32_t max)
 		switch_threadattr_create(&thd_attr, pool);
 		switch_threadattr_stacksize_set(thd_attr, SWITCH_THREAD_STACKSIZE);
 		switch_threadattr_priority_set(thd_attr, SWITCH_PRI_REALTIME);
+		/* 这里就是创建线程了，switch_event_dispatch_thread这个是回调函数 */
 		switch_thread_create(&EVENT_DISPATCH_QUEUE_THREADS[index], thd_attr, switch_event_dispatch_thread, EVENT_DISPATCH_QUEUE, pool);
 		while(--sanity && !EVENT_DISPATCH_QUEUE_RUNNING[index]) switch_yield(10000);
 
@@ -704,6 +722,11 @@ SWITCH_DECLARE(void) switch_event_launch_dispatch_threads(uint32_t max)
 	SOFT_MAX_DISPATCH = index;
 }
 
+/**
+ * 事件系统初始化
+ * @param pool
+ * @return
+ */
 SWITCH_DECLARE(switch_status_t) switch_event_init(switch_memory_pool_t *pool)
 {
 
@@ -2016,6 +2039,7 @@ SWITCH_DECLARE(void) switch_event_prep_for_delivery_detailed(const char *file, c
 
 /**
  * 这个就是提供给外部调用的投递事件函数,执行发送动作的
+ * 另一种说法就是生产事件
  * @param file
  * @param func
  * @param line
@@ -2077,6 +2101,16 @@ SWITCH_DECLARE(switch_status_t) switch_event_get_custom_events(switch_console_ca
 	return x ? SWITCH_STATUS_SUCCESS : SWITCH_STATUS_FALSE;
 }
 
+/**
+ * 订阅相关事件，模块/线程可以调用
+ * @param id
+ * @param event
+ * @param subclass_name
+ * @param callback
+ * @param user_data
+ * @param node
+ * @return
+ */
 SWITCH_DECLARE(switch_status_t) switch_event_bind_removable(const char *id, switch_event_types_t event, const char *subclass_name,
 															switch_event_callback_t callback, void *user_data, switch_event_node_t **node)
 {

@@ -2763,6 +2763,15 @@ static void check_media_timeout_params(switch_core_session_t *session, switch_rt
 	}
 }
 
+/**
+ * 用于从底层的RTP中读取一帧数据
+ * @param session
+ * @param frame
+ * @param flags
+ * @param stream_id
+ * @param type
+ * @return
+ */
 SWITCH_DECLARE(switch_status_t) switch_core_media_read_frame(switch_core_session_t *session, switch_frame_t **frame,
 															 switch_io_flag_t flags, int stream_id, switch_media_type_t type)
 {
@@ -2782,6 +2791,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_media_read_frame(switch_core_session
 		return SWITCH_STATUS_FALSE;
 	}
 
+	/* 找到所需要的媒体引擎 */
 	engine = &smh->engines[type];
 
 	if (type == SWITCH_MEDIA_TYPE_AUDIO && ! switch_channel_test_flag(session->channel, CF_AUDIO)) {
@@ -2942,6 +2952,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_media_read_frame(switch_core_session
 
 
 		/* Try to read an RTCP frame, if successful raise an event */
+		/* 尝试读取一个 RTCP（实时传输控制协议）帧，如果成功则触发一个事件。 */
 		if (switch_rtcp_zerocopy_read_frame(engine->rtp_session, &rtcp_frame) == SWITCH_STATUS_SUCCESS) {
 			switch_event_t *event;
 

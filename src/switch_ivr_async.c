@@ -705,6 +705,7 @@ SWITCH_DECLARE(switch_status_t) switch_ivr_session_echo(switch_core_session_t *s
 	switch_frame_t *read_frame;
 	switch_channel_t *channel = switch_core_session_get_channel(session);
 
+	/* 判断会话有没有应答，就建立媒体连接，另一种就是判断是否已经协商好rtp端口*/
 	if (switch_channel_pre_answer(channel) != SWITCH_STATUS_SUCCESS) {
 		return SWITCH_STATUS_FALSE;
 	}
@@ -722,12 +723,15 @@ SWITCH_DECLARE(switch_status_t) switch_ivr_session_echo(switch_core_session_t *s
 	switch_channel_set_flag(channel, CF_VIDEO_ECHO);
 	switch_channel_set_flag(channel, CF_TEXT_ECHO);
 
+	/* 判断channel是否正常*/
 	while (switch_channel_ready(channel)) {
+		/* 核心点就是这里，从channel读取一帧数据(一个RTP包中的数据)*/
 		status = switch_core_session_read_frame(session, &read_frame, SWITCH_IO_FLAG_NONE, 0);
 		if (!SWITCH_READ_ACCEPTABLE(status)) {
 			break;
 		}
 
+		/* 处理channel上相关事件，如检查DTMF等*/
 		switch_ivr_parse_all_events(session);
 
 		if (args && (args->input_callback || args->buf || args->buflen)) {
@@ -764,6 +768,7 @@ SWITCH_DECLARE(switch_status_t) switch_ivr_session_echo(switch_core_session_t *s
 			}
 		}
 
+		/* 往channel写回音频数据，这样就做到回响功能了*/
 		switch_core_session_write_frame(session, read_frame, SWITCH_IO_FLAG_NONE, 0);
 
 		if (switch_channel_test_flag(channel, CF_BREAK)) {

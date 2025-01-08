@@ -169,10 +169,20 @@ SWITCH_DECLARE(switch_status_t) switch_core_session_read_frame(switch_core_sessi
 		goto even_more_done;
 	}
 
+	/* 根据session不同从不同的源读取数据，例如SIP应用中就从RTP中读取数据，
+	 * 在mod_portaudio中数据是从本地声卡读取，
+	 * 在mod_frddtdm中数据是从TDM板卡驱动中读取的，
+	 * 所以endpoint模块要实现回调函数
+	 */
 	if (session->endpoint_interface->io_routines->read_frame) {
 		switch_mutex_unlock(session->read_codec->mutex);
 		switch_mutex_unlock(session->codec_read_mutex);
 		if ((status = session->endpoint_interface->io_routines->read_frame(session, frame, flags, stream_id)) == SWITCH_STATUS_SUCCESS) {
+			/*
+			 * 判断当前的Session是否注册了其他的事件钩子
+			 * 如果注册了，就调用钩子里的read_frame回调函数
+			 * 除了Endpoint之外，其他的函数或者模块中也可以调用switch_core_event_hook_add_*一族的函数来安装相关的回调函数
+			 */
 			for (ptr = session->event_hooks.read_frame; ptr; ptr = ptr->next) {
 				if ((status = ptr->read_frame(session, frame, flags, stream_id)) != SWITCH_STATUS_SUCCESS) {
 					break;
@@ -181,6 +191,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_session_read_frame(switch_core_sessi
 		}
 
 		if (status == SWITCH_STATUS_INUSE) {
+			/* 如果在读取过程中读取不到数据，为了不出现程序错误就返回静音包*/
 			*frame = &runtime.dummy_cng_frame;
 			switch_yield(20000);
 			return SWITCH_STATUS_SUCCESS;
@@ -232,6 +243,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_session_read_frame(switch_core_sessi
 		goto done;
 	}
 
+	/* 这里就是实现Media Bug，判断channel上有没有安装 Media Bug的回调函数*/
 	if (session->bugs && !((*frame)->flags & SFF_CNG) && !((*frame)->flags & SFF_NOT_AUDIO)) {
 		switch_media_bug_t *bp;
 		switch_bool_t ok = SWITCH_TRUE;
@@ -239,6 +251,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_session_read_frame(switch_core_sessi
 
 		switch_thread_rwlock_rdlock(session->bug_rwlock);
 
+		/* 将Media Bug回调函数一个一个找出来 */
 		for (bp = session->bugs; bp; bp = bp->next) {
 			ok = SWITCH_TRUE;
 
@@ -262,6 +275,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_session_read_frame(switch_core_sessi
 						switch_set_flag((*frame), SFF_CNG);
 						break;
 					}
+					/* 这里就是调用Media Bug的回调函数*/
 					if (bp->callback) {
 						bp->native_read_frame = *frame;
 						ok = bp->callback(bp, bp->user_data, SWITCH_ABC_TYPE_TAP_NATIVE_READ);
@@ -293,6 +307,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_session_read_frame(switch_core_sessi
 		do_resample = 1;
 	}
 
+	/* 这里也是调用Media Bug回调函数，那有什么区别呢*/
 	if (tap_only) {
 		switch_media_bug_t *bp;
 		switch_bool_t ok = SWITCH_TRUE;
@@ -495,6 +510,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_session_read_frame(switch_core_sessi
 
 					codec->cur_frame = read_frame;
 					session->read_codec->cur_frame = read_frame;
+					/* 不管读到什么编码的数据(PCMU、PCMA、iLBC等)，都会转为L16编码 */
 					status = switch_core_codec_decode(codec,
 													  session->read_codec,
 													  read_frame->data,

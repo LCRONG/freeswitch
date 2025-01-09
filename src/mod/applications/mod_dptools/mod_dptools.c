@@ -6437,6 +6437,12 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_dptools_load)
 	switch_mutex_init(&globals.mutex_mutex, SWITCH_MUTEX_NESTED, globals.pool);
 
 	/* connect my internal structure to the blank pointer passed to me */
+	/*
+	 * 翻译：将我的内部结构连接到传递给我的空指针上。
+	 * modname在宏里面定义了全局变量
+	 * module_interface 这个是外面传进来的二级指针
+	 * 赋值给 *module_interface 这个就会改变了外面变量的指向，这样外面可以访问模块里面的内容了
+	 */
 	*module_interface = switch_loadable_module_create_module_interface(pool, modname);
 
 	switch_event_bind(modname, SWITCH_EVENT_PRESENCE_PROBE, SWITCH_EVENT_SUBCLASS_ANY, pickup_pres_event_handler, NULL);

@@ -506,6 +506,7 @@ static void *audio_bridge_thread(switch_thread_t *thread, void *obj)
 	bridge_filter_dtmf = switch_true(switch_channel_get_variable(chan_a, "bridge_filter_dtmf"));
 
 
+	/* 无线循环读取数据*/
 	for (;;) {
 		switch_status_t status;
 		switch_event_t *event;
@@ -796,6 +797,7 @@ static void *audio_bridge_thread(switch_thread_t *thread, void *obj)
 
 
 		/* read audio from 1 channel and write it to the other */
+		/* 从一个声道读取音频，并将其写入另一个声道。 */
 		status = switch_core_session_read_frame(session_a, &read_frame, SWITCH_IO_FLAG_NONE, stream_id);
 
 		if (SWITCH_READ_ACCEPTABLE(status)) {
@@ -1661,6 +1663,7 @@ SWITCH_DECLARE(switch_status_t) switch_ivr_multi_threaded_bridge(switch_core_ses
 	a_leg->clean_exit = 0;
 	a_leg->other_leg_data = b_leg;
 
+	/* 在b-leg 设置回调函数*/
 	switch_channel_add_state_handler(peer_channel, &audio_bridge_peer_state_handlers);
 
 	if (switch_channel_test_flag(peer_channel, CF_ANSWERED) && !switch_channel_test_flag(caller_channel, CF_ANSWERED)) {
@@ -1791,6 +1794,7 @@ SWITCH_DECLARE(switch_status_t) switch_ivr_multi_threaded_bridge(switch_core_ses
 				switch_channel_set_state(peer_channel, CS_EXCHANGE_MEDIA);
 			}
 			
+			/* 阻塞运行 */
 			audio_bridge_thread(NULL, (void *) a_leg);
 
 			switch_channel_clear_flag_recursive(caller_channel, CF_BRIDGE_ORIGINATOR);

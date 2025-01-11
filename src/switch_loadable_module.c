@@ -173,7 +173,7 @@ static switch_status_t switch_loadable_module_process(char *key, switch_loadable
 	new_module->key = switch_core_strdup(new_module->pool, key);
 
 	switch_mutex_lock(loadable_modules.mutex);
-	/* 插入到hash表中记录该模块已被加载 */
+	/* 插入到hash表中记录该模块已被加载,同时也记录的操作模块的指针 */
 	switch_core_hash_insert(loadable_modules.module_hash, key, new_module);
 
 	/* 记录该模块有没有实现endpoint_interface接口，如果实现了也记录到loadable_modules.endpoint_hash 哈希表中*/

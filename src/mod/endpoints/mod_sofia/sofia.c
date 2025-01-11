@@ -2270,6 +2270,12 @@ void sofia_process_dispatch_event(sofia_dispatch_event_t **dep)
 static int msg_queue_threads = 0;
 //static int count = 0;
 
+/**
+ * 处理 sofia_queue_message推进队列的消息
+ * @param thread
+ * @param obj
+ * @return
+ */
 void *SWITCH_THREAD_FUNC sofia_msg_thread_run(switch_thread_t *thread, void *obj)
 {
 	void *pop;
@@ -2335,6 +2341,7 @@ void sofia_msg_thread_start(int idx)
 				switch_threadattr_create(&thd_attr, mod_sofia_globals.pool);
 				switch_threadattr_stacksize_set(thd_attr, SWITCH_THREAD_STACKSIZE);
 				//switch_threadattr_priority_set(thd_attr, SWITCH_PRI_REALTIME);
+				/* 启动一个线程 */
 				switch_thread_create(&mod_sofia_globals.msg_queue_thread[i],
 									 thd_attr,
 									 sofia_msg_thread_run,
@@ -2377,6 +2384,7 @@ void sofia_queue_message(sofia_dispatch_event_t *de)
 		}
 	}
 
+	/* 模块级的消息队列中 */
 	switch_queue_push(mod_sofia_globals.msg_queue, de);
 }
 
@@ -2388,7 +2396,18 @@ static void set_call_id(private_object_t *tech_pvt, sip_t const *sip)
 	}
 }
 
-
+/**
+ * 服务收到SIP消息后，便会调用该函数
+ * @param event
+ * @param status
+ * @param phrase
+ * @param nua
+ * @param profile
+ * @param nh
+ * @param sofia_private
+ * @param sip
+ * @param tags
+ */
 void sofia_event_callback(nua_event_t event,
 						  int status,
 						  char const *phrase,
@@ -2566,6 +2585,7 @@ void sofia_event_callback(nua_event_t event,
 		if (sofia_test_pflag(profile, PFLAG_CALLID_AS_UUID)) {
 			session = switch_core_session_request_uuid(sofia_endpoint_interface, SWITCH_CALL_DIRECTION_INBOUND, SOF_NONE, NULL, sip->sip_call_id->i_id);
 		} else {
+			/* 新建一个session */
 			session = switch_core_session_request(sofia_endpoint_interface, SWITCH_CALL_DIRECTION_INBOUND, SOF_NONE, NULL);
 		}
 
@@ -2602,6 +2622,7 @@ void sofia_event_callback(nua_event_t event,
 		}
 
 
+		/* 启动一个线程处理session */
 		if (switch_core_session_thread_launch(session) != SWITCH_STATUS_SUCCESS) {
 			char *uuid;
 
@@ -2640,6 +2661,7 @@ void sofia_event_callback(nua_event_t event,
 		}
 	}
 
+	/* sip消息队列 */
 	sofia_queue_message(de);
 
  end:
@@ -3121,6 +3143,12 @@ switch_thread_t *launch_sofia_worker_thread(sofia_profile_t *profile)
 	return thread;
 }
 
+ /**
+  * 这个就是profile线程运行的函数
+  * @param thread
+  * @param obj
+  * @return
+ */
 void *SWITCH_THREAD_FUNC sofia_profile_thread_run(switch_thread_t *thread, void *obj)
 {
 	sofia_profile_t *profile = (sofia_profile_t *) obj;
@@ -6336,6 +6364,7 @@ switch_status_t config_sofia(sofia_config_t reload, char *profile_name)
 						switch_event_t *s_event;
 						if (!profile->extsipport) profile->extsipport = profile->sip_port;
 
+						/* 开启新线程运行具体profile */
 						launch_sofia_profile_thread(profile);
 						if (profile->odbc_dsn) {
 							switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "Connecting ODBC Profile %s [%s]\n", profile->name, url);

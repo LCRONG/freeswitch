@@ -2480,10 +2480,18 @@ typedef uint8_t * (*switch_stream_handle_read_function_t) (switch_stream_handle_
 typedef switch_status_t (*switch_stream_handle_write_function_t) (switch_stream_handle_t *handle, const char *fmt, ...);
 typedef switch_status_t (*switch_stream_handle_raw_write_function_t) (switch_stream_handle_t *handle, uint8_t *data, switch_size_t datalen);
 
+/**
+ *
+ * @param cmd 输入的命令
+ * @param session 由于大多数的API命令都跟session无关，因此该参数一般时一个空指针
+ * @param stream 它是一个流，写入该流中的数据可作为命令的结果返回（命令输出）
+ * @return
+ */
 typedef switch_status_t (*switch_api_function_t) (_In_opt_z_ const char *cmd, _In_opt_ switch_core_session_t *session,
 												  _In_ switch_stream_handle_t *stream);
 
 
+/* 上面有解释 */
 #define SWITCH_STANDARD_API(name) static switch_status_t name (_In_opt_z_ const char *cmd, _In_opt_ switch_core_session_t *session, _In_ switch_stream_handle_t *stream)
 
 

@@ -6445,6 +6445,7 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_dptools_load)
 	 */
 	*module_interface = switch_loadable_module_create_module_interface(pool, modname);
 
+	/*订阅SWITCH_EVENT_PRESENCE_PROBE事件，每次触发事件时都会执行pickup_pres_event_handler回调函数 */
 	switch_event_bind(modname, SWITCH_EVENT_PRESENCE_PROBE, SWITCH_EVENT_SUBCLASS_ANY, pickup_pres_event_handler, NULL);
 
 

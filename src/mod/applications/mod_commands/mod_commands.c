@@ -5165,6 +5165,7 @@ SWITCH_STANDARD_API(originate_function)
 		switch_ivr_session_transfer(caller_session, exten, dp, context);
 	}
 
+	/* 就是在这里输出到控制台的 */
 	stream->write_function(stream, "+OK %s\n", switch_core_session_get_uuid(caller_session));
 
 	switch_core_session_rwunlock(caller_session);

@@ -3534,6 +3534,7 @@ static switch_status_t cmd_profile(char **argv, int argc, switch_stream_handle_t
 		switch_xml_reload(&err);
 		stream->write_function(stream, "Reload XML [%s]\n", err);
 
+		/* 从XML中读取该模块的配置 */
 		if (config_sofia(SOFIA_CONFIG_RESCAN, argv[0]) == SWITCH_STATUS_SUCCESS) {
 			stream->write_function(stream, "%s started successfully\n", argv[0]);
 		} else {
@@ -6683,6 +6684,7 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_sofia_load)
 		return SWITCH_STATUS_GENERR;
 	}
 
+	/* 消息线程处理器，用于SIP消息处理 */
 	sofia_msg_thread_start(0);
 
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "Waiting for profiles to start\n");

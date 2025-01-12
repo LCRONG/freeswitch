@@ -21,6 +21,54 @@ void test_switch_buffer()
 	switch_buffer_write(audio_buffer, a, strlen(a));
 }
 
+static switch_xml_t get_directory_xml()
+{
+	switch_xml_t xml = NULL;
+	char *str = "<document type=\"freeswitch/xml\">\n"
+		"<section name=\"dialplan\" description=\"Regex/XML Dialplan\">\n"
+			"<domain name=\"172.29.0.2\">\n"
+				"<params>\n"
+					"<param name=\"dial-string\" value=\"{^^:sip_invite_domain=${dialed_domain}:presence_id=${dialed_user}@${dialed_domain}}${sofia_contact(*/${dialed_user}@${dialed_domain})},${verto_contact(${dialed_user}@${dialed_domain})}\"/>\n"
+					"<param name=\"jsonrpc-allowed-methods\" value=\"verto\"/>\n"
+				"</params>\n"
+				"<variables>\n"
+					"<variable name=\"record_stereo\" value=\"true\"/>\n"
+					"<variable name=\"default_gateway\" value=\"$${default_provider}\"/>\n"
+					"<variable name=\"default_areacode\" value=\"$${default_areacode}\"/>\n"
+					"<variable name=\"transfer_fallback_extension\" value=\"operator\"/>\n"
+				"</variables>\n"
+				"<groups>\n"
+					"<group name=\"default\">\n"
+						"<users>\n"
+							"<user id=\"9999\">\n"
+								"<params>\n"
+									"<param name=\"password\" value=\"1234\"/>\n"
+									"<param name=\"vm-password\" value=\"9999\"/>\n"
+								"</params>\n"
+								"<variables>\n"
+									"<variable name=\"toll_allow\" value=\"domestic,international,local\"/>\n"
+									"<variable name=\"accountcode\" value=\"9999\"/>\n"
+									"<variable name=\"user_context\" value=\"default\"/>\n"
+									"<variable name=\"effective_caller_id_name\" value=\"Extension 9999\"/>\n"
+									"<variable name=\"effective_caller_id_number\" value=\"9999\"/>\n"
+									"<variable name=\"outbound_caller_id_name\" value=\"$${outbound_caller_name}\"/>\n"
+									"<variable name=\"outbound_caller_id_number\" value=\"$${outbound_caller_id}\"/>\n"
+									"<variable name=\"callgroup\" value=\"techsupport\"/>\n"
+								"</variables>\n"
+							"</user>\n"
+						"</users>\n"
+					"</group>\n"
+				"</groups>\n"
+			"</domain>\n"
+		"</section>\n"
+	"</document>";
+	xml = switch_xml_parse_str_dynamic(str, SWITCH_TRUE);
+	if (!xml) {
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "xml parse fail!\n");
+	}
+	return xml;
+}
+
 SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_test_load)
 {
 	/* connect my internal structure to the blank pointer passed to me */
@@ -28,6 +76,8 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_test_load)
 
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "LCR Hello World!\n");
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_CRIT, "CRIT LCR Hello World!\n");
+
+	switch_xml_bind_search_function(get_directory_xml, switch_xml_parse_section_string("directory"), NULL);
 
 	/* indicate that the module should continue to be loaded */
 	return SWITCH_STATUS_SUCCESS;

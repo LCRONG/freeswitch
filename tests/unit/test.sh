@@ -4,6 +4,7 @@
 TESTSUNITPATH=$PWD
 
 # All relative paths are based on the tree's root
+# ps: ./test.sh tests/unit/switch_xml
 FSBASEDIR=$(realpath "$PWD/../../")
 
 i=$1

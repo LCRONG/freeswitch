@@ -25,7 +25,7 @@ static switch_xml_t get_directory_xml()
 {
 	switch_xml_t xml = NULL;
 	char *str = "<document type=\"freeswitch/xml\">\n"
-		"<section name=\"dialplan\" description=\"Regex/XML Dialplan\">\n"
+		"<section name=\"directory\">\n"
 			"<domain name=\"172.29.0.2\">\n"
 				"<params>\n"
 					"<param name=\"dial-string\" value=\"{^^:sip_invite_domain=${dialed_domain}:presence_id=${dialed_user}@${dialed_domain}}${sofia_contact(*/${dialed_user}@${dialed_domain})},${verto_contact(${dialed_user}@${dialed_domain})}\"/>\n"

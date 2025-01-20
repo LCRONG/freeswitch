@@ -88,6 +88,7 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_test_load)
  */
 SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_lcr_test_shutdown)
 {
+	switch_xml_unbind_search_function_ptr(get_directory_xml);
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_NOTICE, "mod_lcr_test_shutdown Hello World!\n");
 	return SWITCH_STATUS_SUCCESS;
 }

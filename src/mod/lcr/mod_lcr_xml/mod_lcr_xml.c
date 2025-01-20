@@ -106,6 +106,7 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_xml_load)
  */
 SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_lcr_xml_shutdown)
 {
+	switch_xml_unbind_search_function_ptr(get_directory_xml);
 	switch_safe_free(globals.odbc_dsn);
 	switch_safe_free(globals.query_sql);
 	return SWITCH_STATUS_SUCCESS;

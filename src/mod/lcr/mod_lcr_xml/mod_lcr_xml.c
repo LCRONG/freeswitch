@@ -1,6 +1,4 @@
 #include <switch.h>
-#include <switch_buffer.h>
-#include <libwebsockets.h>
 
 SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_xml_load);
 SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_lcr_xml_shutdown);

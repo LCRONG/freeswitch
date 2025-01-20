@@ -1,0 +1,7 @@
+<configuration name="lcr_xml.conf" description="Lcr XML Gateway">
+    <settings>
+        <param name="odbc-dsn" value="mariadb://Server=127.0.0.1;Port=3306;Database=fs;Uid=root;Pwd=123456;"/>
+        <param name="query-sql" value="SELECT `field_name` FROM `table_name` LIMIT 1"/>
+        <param name="user-xml-size" value="409600"/>
+    </settings>
+</configuration>

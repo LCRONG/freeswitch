@@ -65,6 +65,8 @@ static switch_cache_db_handle_t *lx_get_db_handle(void)
 static switch_xml_t get_directory_xml()
 {
 	switch_xml_t user_xml = NULL;
+	switch_xml_t domain_xml = NULL;
+	switch_xml_t section_xml = NULL;
 	switch_cache_db_handle_t *dbh = NULL;
 	/* Initialize database */
 	if (!(dbh = lx_get_db_handle())) {
@@ -76,6 +78,20 @@ static switch_xml_t get_directory_xml()
 	switch_cache_db_release_db_handle(&dbh);
 	if (!(user_xml = switch_xml_parse_str_dynamic(globals.user_xml_str, SWITCH_TRUE))) {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "xml parse fail!\n");
+	}
+
+	if (user_xml != NULL) {
+		user_xml->name = "document";
+		//添加属性 d代表default val
+		switch_xml_set_attr_d(user_xml,"type","freeswitch/xml");
+		//获取子节点
+		domain_xml = switch_xml_child(user_xml,"domain");
+		//新建一个tag
+		section_xml = switch_xml_new("section");
+		switch_xml_set_attr_d(section_xml,"name","directory");
+		//将document tag的子节点指向section中
+		user_xml->child = section_xml;
+		section_xml->child = domain_xml;
 	}
 
 	return user_xml;

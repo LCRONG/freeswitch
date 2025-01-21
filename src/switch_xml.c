@@ -1258,6 +1258,15 @@ SWITCH_DECLARE(switch_xml_t) switch_xml_parse_fd(int fd)
 	return &root->xml;
 }
 
+/**
+ * 解析 $${domain}
+ * @param buf
+ * @param ebuf
+ * @param elen
+ * @param newlen
+ * @param err
+ * @return
+ */
 static char *expand_vars(char *buf, char *ebuf, switch_size_t elen, switch_size_t *newlen, const char **err)
 {
 	char *var, *val;
@@ -1413,6 +1422,14 @@ static FILE *preprocess_glob(const char *cwd, const char *pattern, FILE *write_f
 	return write_fd;
 }
 
+/**
+ * 这个函数就是解析<X-PRE-PROCESS>
+ * @param cwd
+ * @param file
+ * @param write_fd
+ * @param rlevel
+ * @return
+ */
 static int preprocess(const char *cwd, const char *file, FILE *write_fd, int rlevel)
 {
 	FILE *read_fd = NULL;
@@ -1449,6 +1466,7 @@ static int preprocess(const char *cwd, const char *file, FILE *write_fd, int rle
 		ebuf = switch_must_malloc(eblen);
 		memset(ebuf, 0, eblen);
 
+		/* 这里解析$${全局变量} */
 		while (!(bp = expand_vars(buf, ebuf, eblen, &cur, &err))) {
 			eblen *= 2;
 			ebuf = switch_must_realloc(ebuf, eblen);
@@ -1696,6 +1714,7 @@ SWITCH_DECLARE(switch_xml_t) switch_xml_parse_file(const char *file)
 
 	setvbuf(write_fd, (char *) NULL, _IOFBF, 65536);
 
+	/* 对xml文件中的预定义标签处理<X-PRE-PROCESS> */
 	if (preprocess(SWITCH_GLOBAL_dirs.conf_dir, file, write_fd, 0) > -1) {
 		fclose(write_fd);
 		write_fd = NULL;
@@ -2359,6 +2378,7 @@ SWITCH_DECLARE(switch_xml_t) switch_xml_open_root(uint8_t reload, const char **e
 	switch_mutex_lock(XML_LOCK);
 
 	if (XML_OPEN_ROOT_FUNCTION) {
+		/* 这个函数加载 freeswitch.xml的*/
 		root = XML_OPEN_ROOT_FUNCTION(reload, err, XML_OPEN_ROOT_FUNCTION_USER_DATA);
 	}
 	switch_mutex_unlock(XML_LOCK);

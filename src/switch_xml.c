@@ -1031,6 +1031,12 @@ static void switch_xml_free_attr(char **attr)
 	free(attr);
 }
 
+/**
+ * 其实这个dynamic只有在dup为true才时正确的说法
+ * @param s
+ * @param dup
+ * @return
+ */
 SWITCH_DECLARE(switch_xml_t) switch_xml_parse_str_dynamic(char *s, switch_bool_t dup)
 {
 	switch_xml_root_t root;
@@ -1039,7 +1045,13 @@ SWITCH_DECLARE(switch_xml_t) switch_xml_parse_str_dynamic(char *s, switch_bool_t
 	switch_assert(s);
 	data = dup ? switch_must_strdup(s) : s;
 
+	/*
+	 * 如果使用了dup，那么复制出来的就会在root-m中
+	 * 由于返回的是 switch_xml_root中的struct switch_xml xml;
+	 * 所以可以强转为switch_xml_root_t，同时也可以访问m了
+	 */
 	if ((root = (switch_xml_root_t) switch_xml_parse_str(data, strlen(data)))) {
+		/* 保证调用switch_xml_free()时会释放root->m这个源字符串 */
 		root->dynamic = 1;		/* Make sure we free the memory is switch_xml_free() */
 		return &root->xml;
 	} else {

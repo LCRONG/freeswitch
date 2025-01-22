@@ -76,7 +76,7 @@ static switch_xml_t get_directory_xml()
 
 	switch_cache_db_execute_sql2str(dbh, globals.query_sql, globals.user_xml_str,globals.user_xml_str_size,NULL);
 	switch_cache_db_release_db_handle(&dbh);
-	if (!(user_xml = switch_xml_parse_str_dynamic(globals.user_xml_str, SWITCH_TRUE))) {
+	if (!(user_xml = switch_xml_parse_str_dup(globals.user_xml_str))) {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "xml parse fail!\n");
 	}
 

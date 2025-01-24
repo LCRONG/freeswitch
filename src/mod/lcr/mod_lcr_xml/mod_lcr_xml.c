@@ -4,47 +4,19 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_xml_load);
 SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_lcr_xml_shutdown);
 SWITCH_MODULE_DEFINITION(mod_lcr_xml, mod_lcr_xml_load, mod_lcr_xml_shutdown, NULL);
 
+struct xml_binding_ud_s
+{
+	char *query_sql;
+	char *bind_mask;
+};
+typedef struct xml_binding_ud_s xml_binding_ud_t;
+
 static struct {
 	switch_memory_pool_t *pool;
 	char *odbc_dsn;
-	char *query_sql;
 	char *user_xml_str;
 	switch_size_t user_xml_str_size;
 } globals;
-
-static switch_status_t load_config(void)
-{
-	char *cf = "lcr_xml.conf";
-	switch_xml_t cfg, xml, settings_tag, param;
-
-	//读取xml配置
-	if (!(xml = switch_xml_open_cfg(cf, &cfg, NULL))) {
-		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "open of %s failed\n", cf);
-		return SWITCH_STATUS_TERM;
-	}
-
-
-	if ((settings_tag =switch_xml_child(cfg, "settings")) == NULL) {
-		goto done;
-	}
-
-	for (param = switch_xml_child(settings_tag, "param"); param; param = param->next) {
-		char *var = (char *) switch_xml_attr_soft(param, "name");
-		char *val = (char *) switch_xml_attr_soft(param, "value");
-		if (!strcasecmp(var, "odbc-dsn")) {
-			globals.odbc_dsn = strdup(val);
-		}else if(!strcasecmp(var, "query-sql")) {
-			globals.query_sql = strdup(val);
-		}else if(!strcasecmp(var, "user-xml-size")) {
-			globals.user_xml_str_size = switch_atoui(val);
-		}
-	}
-
-	done:
-		switch_xml_free(xml);
-
-	return SWITCH_STATUS_SUCCESS;
-}
 
 static switch_cache_db_handle_t *lx_get_db_handle(void)
 {
@@ -62,11 +34,11 @@ static switch_cache_db_handle_t *lx_get_db_handle(void)
 
 }
 
-static switch_xml_t get_directory_xml()
+static switch_xml_t get_directory_xml(const char *section, const char *tag_name, const char *key_name, const char *key_value, switch_event_t *params,
+								  void *user_data)
 {
+	xml_binding_ud_t *ud_obj = (xml_binding_ud_t *) user_data;
 	switch_xml_t user_xml = NULL;
-	switch_xml_t domain_xml = NULL;
-	switch_xml_t section_xml = NULL;
 	switch_cache_db_handle_t *dbh = NULL;
 	/* Initialize database */
 	if (!(dbh = lx_get_db_handle())) {
@@ -74,28 +46,73 @@ static switch_xml_t get_directory_xml()
 		return NULL;
 	}
 
-	switch_cache_db_execute_sql2str(dbh, globals.query_sql, globals.user_xml_str,globals.user_xml_str_size,NULL);
+	switch_cache_db_execute_sql2str(dbh, ud_obj->query_sql, globals.user_xml_str,globals.user_xml_str_size,NULL);
 	switch_cache_db_release_db_handle(&dbh);
 	if (!(user_xml = switch_xml_parse_str_dup(globals.user_xml_str))) {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "xml parse fail!\n");
 	}
 
-	if (user_xml != NULL) {
-		user_xml->name = "document";
-		//添加属性 d代表default val
-		switch_xml_set_attr_d(user_xml,"type","freeswitch/xml");
-		//获取子节点
-		domain_xml = switch_xml_child(user_xml,"domain");
-		//新建一个tag
-		section_xml = switch_xml_new("section");
-		switch_xml_set_attr_d(section_xml,"name","directory");
-		//将document tag的子节点指向section中
-		user_xml->child = section_xml;
-		section_xml->child = domain_xml;
-	}
-
 	return user_xml;
 }
+
+static switch_status_t load_config(void)
+{
+	char *cf = "lcr_xml.conf";
+	switch_xml_t cfg, xml, settings_tag, bindings_tag, param;
+	xml_binding_ud_t *binding_ud_obj = NULL;
+
+	//读取xml配置
+	if (!(xml = switch_xml_open_cfg(cf, &cfg, NULL))) {
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "open of %s failed\n", cf);
+		return SWITCH_STATUS_TERM;
+	}
+
+	if ((settings_tag =switch_xml_child(cfg, "settings")) == NULL) {
+		goto done;
+	}
+
+	for (param = switch_xml_child(settings_tag, "param"); param; param = param->next) {
+		char *var = (char *) switch_xml_attr_soft(param, "name");
+		char *val = (char *) switch_xml_attr_soft(param, "value");
+		if (!strcasecmp(var, "odbc-dsn")) {
+			globals.odbc_dsn = strdup(val);
+		}else if(!strcasecmp(var, "user-xml-size")) {
+			globals.user_xml_str_size = switch_atoui(val);
+		}
+	}
+
+	if ((bindings_tag = switch_xml_child(cfg, "bindings")) == NULL) {
+		goto done;
+	}
+
+	for (param = switch_xml_child(bindings_tag, "binding"); param; param = param->next) {
+		char *query_sql = (char *) switch_xml_attr_soft(param, "query-sql");
+		char *bind_mask = (char *) switch_xml_attr_soft(param, "bindings");
+		if (!strcasecmp(query_sql, "") || !strcasecmp(bind_mask, "")) {
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "miss query-sql or bindings\n");
+			continue;
+		}
+
+		/* 给结构体分配内存*/
+		if (!(binding_ud_obj = switch_core_alloc(globals.pool, sizeof(*binding_ud_obj)))) {
+			goto done;
+		}
+
+		memset(binding_ud_obj, 0, sizeof(*binding_ud_obj));
+
+		binding_ud_obj->query_sql = switch_core_strdup(globals.pool, query_sql);
+		binding_ud_obj->bind_mask = switch_core_strdup(globals.pool, bind_mask);
+
+		switch_xml_bind_search_function(get_directory_xml, switch_xml_parse_section_string(binding_ud_obj->bind_mask),binding_ud_obj);
+		binding_ud_obj = NULL;
+	}
+
+	done:
+		switch_xml_free(xml);
+
+	return SWITCH_STATUS_SUCCESS;
+}
+
 SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_xml_load)
 {
 	switch_status_t status;
@@ -111,8 +128,6 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_lcr_xml_load)
 	/* connect my internal structure to the blank pointer passed to me */
 	*module_interface = switch_loadable_module_create_module_interface(pool, modname);
 
-	switch_xml_bind_search_function(get_directory_xml, switch_xml_parse_section_string("directory"), NULL);
-
 	/* indicate that the module should continue to be loaded */
 	return SWITCH_STATUS_SUCCESS;
 }
@@ -124,7 +139,6 @@ SWITCH_MODULE_SHUTDOWN_FUNCTION(mod_lcr_xml_shutdown)
 {
 	switch_xml_unbind_search_function_ptr(get_directory_xml);
 	switch_safe_free(globals.odbc_dsn);
-	switch_safe_free(globals.query_sql);
 	return SWITCH_STATUS_SUCCESS;
 }
 

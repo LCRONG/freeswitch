@@ -276,6 +276,10 @@ SWITCH_DECLARE(switch_xml_section_t) switch_xml_parse_section_string(const char 
 			if (!SECTIONS[x].name) {
 				break;
 			}
+			/*
+			 * 单纯的字符串查找，所以dialplan|configuration|directory|phrases这样也是可以的
+			 * buf就是dialplan|configuration这个，而SECTIONS[x].name就是dialplan
+			 */
 			if (strstr(buf, SECTIONS[x].name)) {
 				sections |= SECTIONS[x].section;
 			}

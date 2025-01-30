@@ -327,6 +327,7 @@ static void *SWITCH_THREAD_FUNC switch_event_dispatch_thread(switch_thread_t *th
 	THREAD_COUNT++;
 	DISPATCH_THREAD_COUNT++;
 
+	/* 用于查询当前线程位于数组中的偏移位 */
 	for (my_id = 0; my_id < MAX_DISPATCH_VAL; my_id++) {
 		if (EVENT_DISPATCH_QUEUE_THREADS[my_id] == thread) {
 			break;
@@ -338,6 +339,7 @@ static void *SWITCH_THREAD_FUNC switch_event_dispatch_thread(switch_thread_t *th
 		return NULL;
 	}
 
+	/* 设置标志，由于通知外层启动线程成功 */
 	EVENT_DISPATCH_QUEUE_RUNNING[my_id] = 1;
 	switch_mutex_unlock(EVENT_QUEUE_MUTEX);
 
@@ -434,6 +436,7 @@ SWITCH_DECLARE(void) switch_event_deliver(switch_event_t **event)
 		switch_thread_rwlock_rdlock(RWLOCK);
 		/* 判断所有的事件中有哪些事件被哪些节点订阅了，如果有节点订阅，则调用订阅者提供的callback */
 		for (e = (*event)->event_id;; e = SWITCH_EVENT_ALL) {
+			/* e代表事件类型, EVENT_NODES[e]找出该类型下的所有订阅者 */
 			for (node = EVENT_NODES[e]; node; node = node->next) {
 				if (switch_events_match(*event, node)) {
 					(*event)->bind_user_data = node->user_data;
@@ -664,6 +667,7 @@ static void check_dispatch(void)
 		switch_mutex_lock(BLOCK);
 
 		if (!EVENT_DISPATCH_QUEUE) {
+			/* 初始化队列并设置队列最大容量 */
 			switch_queue_create(&EVENT_DISPATCH_QUEUE, DISPATCH_QUEUE_LEN * MAX_DISPATCH, THRUNTIME_POOL);
 			switch_event_launch_dispatch_threads(1);
 
@@ -695,20 +699,26 @@ SWITCH_DECLARE(void) switch_event_launch_dispatch_threads(uint32_t max)
 		return;
 	}
 
+	/*  */
 	if (max < SOFT_MAX_DISPATCH) {
 		return;
 	}
 
+	/* 遍历创建线程 */
 	for (index = SOFT_MAX_DISPATCH; index < max && index < MAX_DISPATCH; index++) {
 		if (EVENT_DISPATCH_QUEUE_THREADS[index]) {
 			continue;
 		}
 
+		/* 创建线程附属信息实例 */
 		switch_threadattr_create(&thd_attr, pool);
+		/* 设置线程栈的最大内存，每个线程都有自己独立的栈空间，栈空间用于存储局部变量、函数调用信息等。*/
 		switch_threadattr_stacksize_set(thd_attr, SWITCH_THREAD_STACKSIZE);
+		/* 估计是设置线程的优先级 */
 		switch_threadattr_priority_set(thd_attr, SWITCH_PRI_REALTIME);
 		/* 这里就是创建线程了，switch_event_dispatch_thread这个是回调函数 */
 		switch_thread_create(&EVENT_DISPATCH_QUEUE_THREADS[index], thd_attr, switch_event_dispatch_thread, EVENT_DISPATCH_QUEUE, pool);
+		/* 等待线程运行成功,sanity保证最大等待次数（又叫计数器） */
 		while(--sanity && !EVENT_DISPATCH_QUEUE_RUNNING[index]) switch_yield(10000);
 
 		if (index == 1) {
@@ -719,6 +729,7 @@ SWITCH_DECLARE(void) switch_event_launch_dispatch_threads(uint32_t max)
 		launched++;
 	}
 
+	/* 当前事件线程数组中的空闲偏移值 */
 	SOFT_MAX_DISPATCH = index;
 }
 
@@ -782,6 +793,16 @@ SWITCH_DECLARE(switch_status_t) switch_event_init(switch_memory_pool_t *pool)
 	return SWITCH_STATUS_SUCCESS;
 }
 
+/**
+ * 创建一个事件
+ * @param file
+ * @param func
+ * @param line
+ * @param event
+ * @param event_id 其实就是事件类型
+ * @param subclass_name
+ * @return
+ */
 SWITCH_DECLARE(switch_status_t) switch_event_create_subclass_detailed(const char *file, const char *func, int line,
 																	  switch_event_t **event, switch_event_types_t event_id, const char *subclass_name)
 {

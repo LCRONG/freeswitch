@@ -2123,7 +2123,7 @@ SWITCH_DECLARE(switch_status_t) switch_event_get_custom_events(switch_console_ca
 }
 
 /**
- * 订阅相关事件，模块/线程可以调用
+ * 订阅相关事件，模块/线程可以调用，removable意思就是返回node地址就可以动态删除
  * @param id
  * @param event
  * @param subclass_name
@@ -2179,6 +2179,7 @@ SWITCH_DECLARE(switch_status_t) switch_event_bind_removable(const char *id, swit
 			event_node->next = EVENT_NODES[event];
 		}
 
+		/* 绑定事件订阅者 */
 		EVENT_NODES[event] = event_node;
 		switch_mutex_unlock(BLOCK);
 		switch_thread_rwlock_unlock(RWLOCK);

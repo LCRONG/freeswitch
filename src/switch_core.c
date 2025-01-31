@@ -1982,6 +1982,7 @@ SWITCH_DECLARE(switch_status_t) switch_core_init(switch_core_flag_t flags, switc
 		switch_nat_init(runtime.memory_pool, switch_test_flag((&runtime), SCF_USE_NAT_MAPPING));
 	}
 
+	/* 日志系统初始化 */
 	switch_log_init(runtime.memory_pool, runtime.colorize_console);
 
 	runtime.tipping_point = 0;

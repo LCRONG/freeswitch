@@ -1307,6 +1307,7 @@ typedef enum {
 SWITCH_CHANNEL_ID_LOG			- Write to the currently defined log
 SWITCH_CHANNEL_ID_LOG_CLEAN		- Write to the currently defined log with no extra file/line/date information
 SWITCH_CHANNEL_ID_EVENT			- Write to the event engine as a LOG event
+SWITCH_CHANNEL_ID_SESSION       - userdata是session，日志限制使用session中的loglevel，日志结构体中userdata字段使用session的uuid，tags使用channel的tags，将内容写入当前定义的日志中。
 </pre>
  */
 typedef enum {

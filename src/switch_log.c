@@ -485,6 +485,9 @@ SWITCH_DECLARE(switch_status_t) switch_log_bind_logger(switch_log_function_t fun
 
 static switch_thread_t *thread;
 
+/*
+ * 用于消费日志队列（独立线程启动）
+ */
 static void *SWITCH_THREAD_FUNC log_thread(switch_thread_t *t, void *obj)
 {
 
@@ -510,6 +513,7 @@ static void *SWITCH_THREAD_FUNC log_thread(switch_thread_t *t, void *obj)
 		node = (switch_log_node_t *) pop;
 		switch_mutex_lock(BINDLOCK);
 		node->sequence = ++log_sequence;
+		/* 判断哪种日志级别被订阅了，执行对应的回调函数 */
 		for (binding = BINDINGS; binding; binding = binding->next) {
 			if (binding->level >= node->level) {
 				binding->function(node, node->level);
@@ -603,8 +607,10 @@ SWITCH_DECLARE(void) switch_log_meta_vprintf(switch_text_channel_t channel, cons
 
 	switch_assert(level < SWITCH_LOG_INVALID);
 
+	/* 理论上是stdout宏-屏幕 */
 	handle = switch_core_data_channel(channel);
 
+	/* 将内容写入当前定义的日志，判断是否需要添加额外的文件、行号或日期信息。 */
 	if (channel != SWITCH_CHANNEL_ID_LOG_CLEAN) {
 		char date[80] = "";
 		//switch_size_t retsize;
@@ -632,6 +638,7 @@ SWITCH_DECLARE(void) switch_log_meta_vprintf(switch_text_channel_t channel, cons
 		fmt = new_fmt;
 	}
 
+	/* 应该就是格式化字符串了 */
 	ret = switch_vasprintf(&data, fmt, ap);
 
 	if (ret == -1) {
@@ -642,12 +649,13 @@ SWITCH_DECLARE(void) switch_log_meta_vprintf(switch_text_channel_t channel, cons
 	if (channel == SWITCH_CHANNEL_ID_LOG_CLEAN) {
 		content = data;
 	} else {
+		/* 将128替换为空字符串 */
 		if ((content = strchr(data, 128))) {
 			*content = ' ';
 		}
 	}
 
-	//发事件不写日志
+	/* 以日志事件的形式写入事件引擎。 */
 	if (channel == SWITCH_CHANNEL_ID_EVENT) {
 		switch_event_t *event;
 		if (switch_event_running() == SWITCH_STATUS_SUCCESS && switch_event_create(&event, SWITCH_EVENT_LOG) == SWITCH_STATUS_SUCCESS) {
@@ -666,6 +674,10 @@ SWITCH_DECLARE(void) switch_log_meta_vprintf(switch_text_channel_t channel, cons
 		goto end;
 	}
 
+	/*
+	 * console_mods_loaded:判断是否有模块实现控制台输出日志并绑定到当前文件的BINDINGS
+	 * do_mods: 就是判断日志队列和处理日志线程都启动成功
+	 */
 	if (console_mods_loaded == 0 || !do_mods) {
 		if (handle) {
 			int aok = 1;
@@ -730,6 +742,7 @@ SWITCH_DECLARE(void) switch_log_meta_vprintf(switch_text_channel_t channel, cons
 			node->userdata = !zstr(userdata) ? strdup(userdata) : NULL;
 		}
 
+		/* 推送到日志队列中等待消费 */
 		if (switch_queue_trypush(LOG_QUEUE, node) != SWITCH_STATUS_SUCCESS) {
 			switch_log_node_free(&node);
 		}

@@ -766,12 +766,14 @@ SWITCH_DECLARE(switch_status_t) switch_log_init(switch_memory_pool_t *pool, swit
 
 	switch_threadattr_create(&thd_attr, LOG_POOL);
 
+	/* 创建日志队列 */
 	switch_queue_create(&LOG_QUEUE, SWITCH_CORE_QUEUE_LEN, LOG_POOL);
 #ifdef SWITCH_LOG_RECYCLE
 	switch_queue_create(&LOG_RECYCLE_QUEUE, SWITCH_CORE_QUEUE_LEN, LOG_POOL);
 #endif
 	switch_mutex_init(&BINDLOCK, SWITCH_MUTEX_NESTED, LOG_POOL);
 	switch_threadattr_stacksize_set(thd_attr, SWITCH_THREAD_STACKSIZE);
+	/* 创建并启动日志消费线程,log_thread消费函数 */
 	switch_thread_create(&thread, thd_attr, log_thread, NULL, LOG_POOL);
 
 	while (!THREAD_RUNNING) {

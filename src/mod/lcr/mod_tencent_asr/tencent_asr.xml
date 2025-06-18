@@ -1,0 +1,9 @@
+<configuration name="tencent_asr.conf" description="mod_ali_asr configuration">
+    <settings>
+        <param name="appid" value="12312"/>
+        <param name="secret_id" value="213213"/>
+        <param name="secret_key" value="123213"/>
+        <param name="engine_model_type" value="8k_zh"/>
+        <param name="max_sentence_silence" value="800"/>
+    </settings>
+</configuration>

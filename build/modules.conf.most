@@ -164,3 +164,4 @@ lcr/mod_lcr_asr
 lcr/mod_lcr_test
 lcr/mod_lcr_app
 lcr/mod_lcr_xml
+lcr/mod_tencent_asr

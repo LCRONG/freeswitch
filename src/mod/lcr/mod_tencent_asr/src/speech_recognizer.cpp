@@ -1,0 +1,548 @@
+
+// Copyright 1998-2020 Tencent Copyright
+#include "../include/speech_recognizer.h"
+#include <stddef.h>
+#include "rapidjson/document.h"
+#include "../include/tcloud_util.h"
+#include <websocketpp/config/asio_client.hpp>
+#include <websocketpp/client.hpp>
+#include <websocketpp/common/thread.hpp>
+#include <websocketpp/common/memory.hpp>
+#include <cstdlib>
+#include <iostream>
+#include <map>
+#include <string>
+#include <sstream>
+
+#ifdef _WIN32
+#include "unistd_win.h"
+#include <windows.h>
+#define sleep(sec) Sleep(sec * 1000)
+#define msleep(msec) Sleep(msec)
+#else
+#include <pthread.h>
+#include <unistd.h>
+#define msleep(msec) usleep(msec * 1000)
+#endif
+
+#define URL_MAX_LENGTH 1024000
+typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
+using websocketpp::lib::bind;
+using websocketpp::lib::placeholders::_1;
+using websocketpp::lib::placeholders::_2;
+typedef websocketpp::config::asio_tls_client::message_type::ptr message_ptr;
+typedef websocketpp::lib::shared_ptr<websocketpp::lib::asio::ssl::context> context_ptr;
+
+template <class P, class M> size_t my_offsetof(const M P::*member) {
+    return (size_t) & (reinterpret_cast<P *>(0)->*member);
+}
+
+template <class P, class M>
+P *my_container_of_impl(M *ptr, const M P::*member) {
+    return reinterpret_cast<P *>(reinterpret_cast<char *>(ptr) -
+                                 my_offsetof(member));
+}
+
+#define my_container_of(ptr, type, member)                                     \
+    my_container_of_impl(ptr, &type::member)
+
+void OnOpen(client *c, websocketpp::connection_hdl hdl);
+void OnMessage(client *c, websocketpp::connection_hdl hdl, message_ptr msg);
+void OnClose(client *c, websocketpp::connection_hdl hdl);
+void OnFail(client *c, websocketpp::connection_hdl hdl);
+context_ptr OnTlsInit(const char * hostname, websocketpp::connection_hdl);
+
+class SpeechListener {
+ public:
+    void* GetCustomPara() const { return m_custom_para; } // 添加访问器函数
+    SpeechListener(void *ptr, std::string url) {
+        m_url = url;
+        m_parent_ptr = ptr;
+    }
+
+    ~SpeechListener() { m_parent_ptr = NULL; }
+
+    void Start(void* para) {
+        m_custom_para = para; // 传递 custom_para
+        m_endpoint.set_error_channels(websocketpp::log::elevel::all);
+        m_endpoint.set_access_channels(websocketpp::log::alevel::all);
+        m_endpoint.clear_error_channels(websocketpp::log::elevel::rerror);
+        m_endpoint.clear_access_channels(
+            websocketpp::log::alevel::frame_payload);
+        m_endpoint.clear_access_channels(
+            websocketpp::log::alevel::frame_header);
+        //  如果想显示websocket的连接信息可以注释下面两行
+        m_endpoint.clear_access_channels(websocketpp::log::alevel::connect);
+        m_endpoint.clear_access_channels(websocketpp::log::alevel::disconnect);
+
+        m_endpoint.init_asio();
+        m_endpoint.set_message_handler(
+            bind(&OnMessage, &m_endpoint, ::_1, ::_2));
+        m_endpoint.set_open_handler(bind(&OnOpen, &m_endpoint, _1));
+        m_endpoint.set_close_handler(bind(&OnClose, &m_endpoint, _1));
+        m_endpoint.set_fail_handler(bind(&OnFail, &m_endpoint, _1));
+        std::string hostname = REALTIME_ASR_HOSTNAME;
+        m_endpoint.set_tls_init_handler(bind(&OnTlsInit, hostname.c_str(), ::_1));
+        websocketpp::lib::error_code ec;
+        m_con = m_endpoint.get_connection(m_url, ec);
+        m_con->add_subprotocol("janus-protocol");
+        if (ec) {
+            std::cout << "could not create connection because: " << ec.message()
+                      << std::endl;
+            return;
+        }
+//        auto hdl = m_con->get_handle();
+        m_con->get_handle();
+        m_endpoint.connect(m_con);
+        m_endpoint.start_perpetual();
+        m_thread.reset(new websocketpp::lib::thread(&client::run, &m_endpoint));
+    }
+
+    int GetState() { return m_con->get_state(); }
+
+    void SendText(const char *payload, size_t len) {
+        m_con->send(payload, len, websocketpp::frame::opcode::text);
+    }
+
+    void SendBinary(void *payload, size_t len) {
+        m_con->send(payload, len, websocketpp::frame::opcode::binary);
+    }
+
+    void Terminate() {
+        m_endpoint.stop_perpetual();
+        m_thread->join();
+    }
+
+    void Cancel() {
+        m_endpoint.stop();
+        //m_thread->detach();
+        m_thread->join();
+    }
+
+    client m_endpoint;
+    std::string m_url;
+    websocketpp::lib::shared_ptr<websocketpp::lib::thread> m_thread;
+
+    void *m_parent_ptr;
+    std::string m_voice_id;
+    client::connection_ptr m_con;
+
+    void *m_custom_para; // 添加 custom_para 成员变量
+};
+
+void OnOpen(client *c, websocketpp::connection_hdl hdl) {
+    SpeechListener *listener = my_container_of(c, SpeechListener, m_endpoint);
+    SpeechRecognizer *recognizer =
+        reinterpret_cast<SpeechRecognizer *>(listener->m_parent_ptr);
+    SpeechRecognitionResponse rsp;
+    rsp.voice_id = recognizer->m_config.voice_id;
+    recognizer->SetReady();
+    recognizer->on_recognition_start(&rsp, listener->GetCustomPara());
+}
+
+context_ptr OnTlsInit(const char * hostname, websocketpp::connection_hdl){
+    context_ptr ctx = websocketpp::lib::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::sslv23);
+    return ctx;
+}
+
+void OnClose(client *c, websocketpp::connection_hdl hdl) {
+     //std::cout << "====OnClose=====" << std::endl;
+}
+
+void OnFail(client *c, websocketpp::connection_hdl hdl) {
+    SpeechListener *listener = my_container_of(c, SpeechListener, m_endpoint);
+    SpeechRecognizer *recognizer =
+        reinterpret_cast<SpeechRecognizer *>(listener->m_parent_ptr);
+    recognizer->SetFailed();
+}
+
+SpeechRecognitionResponse *decode_response(std::string message) {
+    rapidjson::Document doc;
+    doc.Parse(message.c_str());
+    SpeechRecognitionResponse *rsp = new SpeechRecognitionResponse;
+    if (rsp == NULL) {
+        std::cout << "new SpeechRecognizerResponse failed" << std::endl;
+        return NULL;
+    }
+    if (doc.HasMember("code") && doc["code"].IsInt()) {
+        rsp->code = doc["code"].GetInt();
+    }
+    if (doc.HasMember("message") && doc["message"].IsString()) {
+        rsp->message = doc["message"].GetString();
+    }
+    if (doc.HasMember("voice_id") && doc["voice_id"].IsString()) {
+        rsp->voice_id = doc["voice_id"].GetString();
+    }
+    if (doc.HasMember("message_id") && doc["message_id"].IsString()) {
+        rsp->message_id = doc["message_id"].GetString();
+    }
+    if (doc.HasMember("final") && doc["final"].IsInt()) {
+        rsp->final_rsp = doc["final"].GetUint();
+    }
+    if (doc.HasMember("result") && doc["result"].IsObject()) {
+        for (rapidjson::Value::ConstMemberIterator itr =
+                 doc["result"].MemberBegin();
+             itr != doc["result"].MemberEnd(); ++itr) {
+            if (itr->name.GetString() == std::string("slice_type")) {
+                rsp->result.slice_type = itr->value.GetUint();
+            }
+            if (itr->name.GetString() == std::string("index")) {
+                rsp->result.index = itr->value.GetInt();
+            }
+            if (itr->name.GetString() == std::string("start_time")) {
+                rsp->result.start_time = itr->value.GetUint();
+            }
+            if (itr->name.GetString() == std::string("end_time")) {
+                rsp->result.end_time = itr->value.GetUint();
+            }
+            if (itr->name.GetString() == std::string("voice_text_str")) {
+                rsp->result.voice_text_str = itr->value.GetString();
+            }
+            if (itr->name.GetString() == std::string("word_size")) {
+                rsp->result.word_size = itr->value.GetUint();
+            }
+            if (itr->name.GetString() == std::string("word_list")) {
+                if (itr->value.IsArray()) {
+                    for (rapidjson::Value::ConstValueIterator itr_arr =
+                             itr->value.Begin();
+                         itr_arr != itr->value.End(); ++itr_arr) {
+                        if (itr_arr->IsObject()) {
+                            ResultWord result_word;
+                            for (rapidjson::Value::ConstMemberIterator
+                                     itr_word = itr_arr->MemberBegin();
+                                 itr_word != itr_arr->MemberEnd(); ++itr_word) {
+                                if (itr_word->name.GetString() ==
+                                    std::string("start_time")) {
+                                    result_word.start_time =
+                                        itr_word->value.GetUint();
+                                } else if (itr_word->name.GetString() ==
+                                    std::string("end_time")) {
+                                    result_word.end_time =
+                                        itr_word->value.GetUint();
+                                } else if (itr_word->name.GetString() ==
+                                    std::string("stable_flag")) {
+                                    result_word.stable_flag =
+                                        itr_word->value.GetUint();
+                                } else if (itr_word->name.GetString() ==
+                                    std::string("word")) {
+                                    result_word.word =
+                                        itr_word->value.GetString();
+                                }
+                            }
+                            rsp->result.word_list.push_back(result_word);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return rsp;
+}
+
+void OnMessage(client *c, websocketpp::connection_hdl hdl, message_ptr msg) {
+    std::string payload = msg->get_payload();
+    SpeechListener *listener = my_container_of(c, SpeechListener, m_endpoint);
+    SpeechRecognizer *recognizer =
+        reinterpret_cast<SpeechRecognizer *>(listener->m_parent_ptr);
+
+    SpeechRecognitionResponse *rsp = decode_response(payload);
+    if (!rsp) {
+        return;
+    }
+    if (rsp->code != 0) {
+        if (rsp->voice_id.length() == 0) {
+            rsp->voice_id = recognizer->m_config.voice_id;
+        }
+        recognizer->on_task_failed(rsp, listener->GetCustomPara());
+        delete rsp;
+        return;
+    }
+
+    if (rsp->final_rsp == 1) {
+        recognizer->on_recognition_complete(rsp, listener->GetCustomPara());
+        delete rsp;
+        return;
+    }
+
+    if (rsp->result.slice_type == 0) {
+        if (rsp->voice_id != "" && rsp->message_id != "") {
+            recognizer->on_sentence_begin(rsp, listener->GetCustomPara());
+        }
+    } else if (rsp->result.slice_type == 2) {
+        recognizer->on_sentence_end(rsp, listener->GetCustomPara());
+    } else if (rsp->result.slice_type == 1) {
+        recognizer->on_recognition_result_changed(rsp, listener->GetCustomPara());
+    }
+
+    delete rsp;
+}
+
+SpeechRecognizer::SpeechRecognizer(std::string appid, std::string secret_id,
+                                   std::string secret_key) {
+    InitSpeechRecognizerConfig(appid, secret_id, secret_key);
+    ready_ = false;
+    failed_ = false;
+}
+SpeechRecognizer::~SpeechRecognizer() {}
+
+int SpeechRecognizer::Start(void* para) {
+    m_listener = new SpeechListener(this, GetWebsocketURL());
+    m_listener->Start(para);
+    int cnt = 0;
+    while(!ready_) {
+        if (failed_) {
+            return -1;
+        }
+        msleep(50);
+        cnt += 1;
+        //waiting 1 second
+        if (cnt >= 20) {
+            return -2;
+        }
+    }
+    return 0;
+}
+
+void SpeechRecognizer::Stop() {
+    std::string end_str = "{\"type\":\"end\"}";
+    m_listener->SendText(end_str.c_str(), end_str.length());
+    m_listener->Terminate();
+    delete m_listener;
+}
+
+void SpeechRecognizer::Cancel() {
+    m_listener->Cancel();
+}
+
+void SpeechRecognizer::SetFailed() {
+    failed_ = true;
+}
+
+void SpeechRecognizer::SetReady() {
+    ready_ = true;
+}
+
+void SpeechRecognizer::Write(void *payload, size_t len) {
+    m_listener->SendBinary(payload, len);
+}
+
+void SpeechRecognizer::SetOnFail(ASRCallBackFunc event) {
+    on_task_failed = event;
+}
+void SpeechRecognizer::SetOnRecognitionStart(ASRCallBackFunc event) {
+    on_recognition_start = event;
+}
+
+void SpeechRecognizer::SetOnRecognitionComplete(ASRCallBackFunc event) {
+    on_recognition_complete = event;
+}
+
+void SpeechRecognizer::SetOnRecognitionResultChanged(ASRCallBackFunc event) {
+    on_recognition_result_changed = event;
+}
+
+void SpeechRecognizer::SetOnSentenceBegin(ASRCallBackFunc event) {
+    on_sentence_begin = event;
+}
+
+void SpeechRecognizer::SetOnSentenceEnd(ASRCallBackFunc event) {
+    on_sentence_end = event;
+}
+
+void SpeechRecognizer::SetVoiceId(std::string voice_id) {
+    m_config.voice_id = voice_id;
+}
+
+void SpeechRecognizer::SetNonce(uint64_t nonce) {
+    m_config.nonce = std::to_string(nonce);
+}
+
+void SpeechRecognizer::SetEngineModelType(std::string engine_model_type) {
+    m_config.engine_model_type = engine_model_type;
+}
+
+void SpeechRecognizer::SetVoiceFormat(int voice_format) {
+    m_config.voice_format = std::to_string(voice_format);
+}
+
+void SpeechRecognizer::SetNeedVad(int need_vad) {
+    m_config.need_vad = std::to_string(need_vad);
+}
+
+void SpeechRecognizer::SetHotwordId(std::string hotword_id) {
+    m_config.hotword_id = hotword_id;
+}
+
+void SpeechRecognizer::SetHotwordList(std::string hotword_list) {
+    m_config.hotword_list = hotword_list;
+}
+
+void SpeechRecognizer::SetReplaceTextId(std::string replace_text_id)  {
+    m_config.replace_text_id = replace_text_id;
+}
+
+void SpeechRecognizer::SetToken(std::string token) {
+    m_config.token = token;
+}
+
+void SpeechRecognizer::SetCustomizationId(std::string customization_id) {
+    m_config.customization_id = customization_id;
+}
+
+void SpeechRecognizer::SetFilterDirty(int filter_dirty) {
+    m_config.filter_dirty = std::to_string(filter_dirty);
+}
+
+void SpeechRecognizer::SetFilterPunc(int filter_punc) {
+    m_config.filter_punc = std::to_string(filter_punc);
+}
+
+void SpeechRecognizer::SetSilenceTimeout(int silence_timeout) {
+    m_config.silence_timeout = std::to_string(silence_timeout);
+}
+
+void SpeechRecognizer::SetMaxSpeakTime(int max_speak_time) {
+    m_config.max_speak_time = std::to_string(max_speak_time);
+}
+
+void SpeechRecognizer::SetNoiseThreshold(float noise_threshold) {
+    m_config.noise_threshold = std::to_string(noise_threshold);
+}
+
+void SpeechRecognizer::SetReinforceHotword(int reinforce_hotword) {
+    m_config.reinforce_hotword = std::to_string(reinforce_hotword);
+}
+
+void SpeechRecognizer::SetFilterEmptyResult(int filter_empty_result) {
+    m_config.filter_empty_result = std::to_string(filter_empty_result);
+}
+
+void SpeechRecognizer::SetFilterModal(int filter_modal) {
+    m_config.filter_model = std::to_string(filter_modal);
+}
+void SpeechRecognizer::SetConvertNumMode(int convert_num_mode) {
+    m_config.convert_num_mode = std::to_string(convert_num_mode);
+}
+
+void SpeechRecognizer::SetWordInfo(int word_info) {
+    m_config.word_info = std::to_string(word_info);
+}
+
+void SpeechRecognizer::SetVadSilenceTime(int vad_silence_time) {
+    m_config.vad_silence_time = std::to_string(vad_silence_time);
+}
+
+void SpeechRecognizer::InitSpeechRecognizerConfig(std::string appid,
+                                                  std::string secret_id,
+                                                  std::string secret_key) {
+    m_config.secret_id = secret_id;
+    m_config.appid = appid;
+    m_config.secret_key = secret_key;
+    m_config.engine_model_type = "16k_zh";
+    m_config.voice_format = "1";
+    m_config.need_vad = "0";
+    m_config.filter_dirty = "0";
+    m_config.filter_model = "0";
+    m_config.filter_punc = "0";
+    m_config.filter_empty_result = "1";
+    m_config.reinforce_hotword = "0";
+    m_config.convert_num_mode = "0";
+    m_config.word_info = "0";
+    m_config.hotword_id = "";
+    m_config.token = "";
+    m_config.hotword_list = "";
+    m_config.customization_id = "";
+    m_config.noise_threshold = "";
+    m_config.nonce = "";
+    char str[32] = { 0 };
+    memset(str, 0, 32);
+    srand(time(0) + TCloudUtil::gettid());  // 默认根据线程号生成voice_id
+    snprintf(str, sizeof(str), "%d", rand());
+    m_config.voice_id = str;
+    m_config.vad_silence_time = "";
+    m_config.silence_timeout = "";
+    m_config.max_speak_time = "";
+    m_config.replace_text_id = "";
+}
+
+void SpeechRecognizer::BuildRequest() {
+    m_builder.SetKeyValue("secret_key", m_config.secret_key);
+    m_builder.SetKeyValue("secretid", m_config.secret_id);
+    m_builder.SetKeyValue("appid", m_config.appid);
+    m_builder.SetKeyValue("engine_model_type", m_config.engine_model_type);
+    m_builder.SetKeyValue("voice_format", m_config.voice_format);
+    m_builder.SetKeyValue("filter_dirty", m_config.filter_dirty);
+    m_builder.SetKeyValue("filter_modal", m_config.filter_model);
+    m_builder.SetKeyValue("filter_punc", m_config.filter_punc);
+    m_builder.SetKeyValue("reinforce_hotword", m_config.reinforce_hotword);
+    m_builder.SetKeyValue("filter_empty_result", m_config.filter_empty_result);
+    m_builder.SetKeyValue("convert_num_mode", m_config.convert_num_mode);
+    m_builder.SetKeyValue("word_info", m_config.word_info);
+    // 如果音频大小超过60s，需要设置needvad为1
+    m_builder.SetKeyValue("needvad", m_config.need_vad);
+    if (m_config.hotword_id.length() > 0) {
+        m_builder.SetKeyValue("hotword_id", m_config.hotword_id);
+    }
+    if (m_config.token.length() > 0) {
+        m_builder.SetKeyValue("token", m_config.token);
+    }
+    if (m_config.hotword_list.length() > 0) {
+        m_builder.SetKeyValue("hotword_list", m_config.hotword_list);
+    }
+    if (m_config.replace_text_id.length() > 0) {
+        m_builder.SetKeyValue("replace_text_id", m_config.replace_text_id);
+    }
+
+    if (m_config.customization_id.length() > 0) {
+        m_builder.SetKeyValue("customization_id", m_config.customization_id);
+    }
+    if (m_config.noise_threshold.length() > 0) {
+        m_builder.SetKeyValue("noise_threshold", m_config.noise_threshold);
+    }
+    if (m_config.nonce.length() > 0) {
+        m_builder.SetKeyValue("nonce", m_config.nonce);
+    }
+    if (m_config.vad_silence_time.length() > 0) {
+        m_builder.SetKeyValue("vad_silence_time", m_config.vad_silence_time);
+    }
+    if (m_config.silence_timeout.length() > 0) {
+        m_builder.SetKeyValue("silence_timeout", m_config.silence_timeout);
+    }
+    if (m_config.max_speak_time.length() > 0) {
+        m_builder.SetKeyValue("max_speak_time", m_config.max_speak_time);
+    }
+    m_builder.SetKeyValue("voice_id", m_config.voice_id);
+}
+
+std::string SpeechRecognizer::GetRequestURL() {
+    std::string requestURL;
+    std::string urlFormat = REALTIME_ASR_URL_FORMAT;
+
+    char *pUrlBuffer = new char[URL_MAX_LENGTH];
+    memset(pUrlBuffer, 0, URL_MAX_LENGTH);
+    BuildRequest();
+    snprintf(pUrlBuffer, URL_MAX_LENGTH - 1, urlFormat.c_str(),
+             m_config.appid.c_str(), m_builder.GetURLParamString(true).c_str(),
+             m_builder.GetAuthorization().c_str());
+    requestURL = pUrlBuffer;
+    delete[] pUrlBuffer;
+    pUrlBuffer = NULL;
+
+    return requestURL;
+}
+
+std::string SpeechRecognizer::GetWebsocketURL() {
+    char str[32] = { 0 };
+    memset(str, 0, 32);
+
+    snprintf(str, sizeof(str), "%d", (uint32_t)time(NULL));
+    m_builder.SetKeyValue("timestamp", str);
+    if (m_config.nonce.length() == 0) {
+        m_builder.SetKeyValue("nonce", str);
+    }
+    memset(str, 0, 32);
+    snprintf(str, sizeof(str), "%d", (uint32_t)time(NULL) + 6000);
+    m_builder.SetKeyValue("expired", str);
+    m_builder.SetKeyValue("timeout", "5000");
+    return GetRequestURL();
+}

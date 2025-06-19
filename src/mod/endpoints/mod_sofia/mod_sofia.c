@@ -121,6 +121,7 @@ static switch_status_t sofia_on_init(switch_core_session_t *session)
 	}
 
 	if (sofia_test_flag(tech_pvt, TFLAG_OUTBOUND) || switch_channel_test_flag(tech_pvt->channel, CF_RECOVERING)) {
+		/* 发起INVITE的SIP */
 		if (sofia_glue_do_invite(session) != SWITCH_STATUS_SUCCESS) {
 			switch_channel_hangup(channel, SWITCH_CAUSE_DESTINATION_OUT_OF_ORDER);
 			assert(switch_channel_get_state(channel) != CS_INIT);
@@ -6769,6 +6770,7 @@ SWITCH_MODULE_LOAD_FUNCTION(mod_sofia_load)
 	sofia_endpoint_interface = switch_loadable_module_create_interface(*module_interface, SWITCH_ENDPOINT_INTERFACE);
 	sofia_endpoint_interface->interface_name = "sofia";
 	sofia_endpoint_interface->io_routines = &sofia_io_routines;
+	/* 状态机中回调函数switch_core_session_run() */
 	sofia_endpoint_interface->state_handler = &sofia_event_handlers;
 	sofia_endpoint_interface->recover_callback = sofia_recover_callback;
 
